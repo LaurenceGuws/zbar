@@ -1,0 +1,160 @@
+{
+  "zbar config": {
+    "prefix": "zbar-config",
+    "body": [
+      "---@type ZbarConfig",
+      "return {",
+      "  bar = {",
+      "    height_px = ${1:28},",
+      "    section_gap_px = ${2:12},",
+      "    background = \"${3:#11161c}\",",
+      "    foreground = \"${4:#d7dee7}\",",
+      "    theme = {",
+      "      ${5:segment_background = \"#2a3139\"},",
+
+      "      ${6:accent_background = \"#275b7a\"},",
+
+      "      ${7:subtle_background = \"#1c232a\"},",
+
+      "      ${8:warning_background = \"#7a4627\"},",
+
+      "      ${9:accent_foreground = \"#eff5fa\"},",
+
+      "      ${10:font_path = \"/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf\"},",
+
+      "      ${11:font_fallback_path = \"/usr/share/fonts/TTF/IosevkaTermNerdFont-Regular.ttf\"},",
+
+      "      ${12:font_fallback_path_2 = \"/usr/share/fonts/TTF/Hack-Regular.ttf\"},",
+
+      "      ${13:preview_width_px = 1280},",
+
+      "      ${14:anchor = \"top\"},",
+
+      "      ${15:horizontal_padding_px = 18},",
+
+      "      ${16:segment_padding_x_px = 10},",
+
+      "      ${17:segment_padding_y_px = 6},",
+
+      "      ${18:font_points = 15},",
+      "    },",
+      "    left = {",
+      "      ${19:zbar.provider.workspaces({ format = \"ws {focused}/{total}\" })},",
+      "      ${20:zbar.provider.mode({ format = \"{compositor}\" })},",
+      "    },",
+      "    center = {",
+      "      ${21:zbar.provider.window({ name = \"title\", max_width = 96 })},",
+      "    },",
+      "    right = {",
+      "      ${22:zbar.provider.cpu({ interval_ms = 1000, format = \"cpu {usage}%\" })},",
+      "      ${23:zbar.provider.memory({ interval_ms = 1000, format = \"mem {used_gib:.1}G\" })},",
+      "      ${24:zbar.provider.clock({ name = \"unix\", interval_ms = 1000, format = \"{timestamp}\" })},",
+      "    },",
+      "  },",
+      "  integrations = {",
+      "    zide_socket_name = \"${25:zide-ipc.sock}\",",
+      "    wayspot_socket_name = \"${26:wayspot-ipc.sock}\",",
+      "  },",
+      "  providers = {",
+      "    workspaces = {",
+      "      ${27:show_empty = false},",
+      "    },",
+
+      "    window = {",
+      "      ${28:truncate = true},",
+      "    },",
+
+      "    cpu = {",
+      "      ${29:usage = 0},",
+      "      ${30:sample_window = 4},",
+      "    },",
+
+      "    memory = {",
+      "      ${31:unit = \"gib\"},",
+      "      ${32:used_gib = 0.0},",
+      "      ${33:used_mib = 0},",
+      "    },",
+
+      "    clock = {",
+      "      ${34:timezone = \"local\"},",
+      "    },",
+      "  },",
+      "}",
+      ""
+    ],
+    "description": "Full zbar Lua config scaffold"
+  },
+  "zbar workspaces provider": {
+    "prefix": "zbar-workspaces",
+    "body": [
+      "zbar.provider.workspaces({",
+      "  format = \"ws {focused}/{total}\",",
+      "  settings = {",
+      "    ${2:show_empty = false},",
+      "  },",
+      "})"
+    ],
+    "description": "Workspace status provider."
+  },
+  "zbar mode provider": {
+    "prefix": "zbar-mode",
+    "body": [
+      "zbar.provider.mode({",
+      "  format = \"{compositor}\",",
+      "  settings = {",
+      "  },",
+      "})"
+    ],
+    "description": "Compositor mode provider."
+  },
+  "zbar window provider": {
+    "prefix": "zbar-window",
+    "body": [
+      "zbar.provider.window({",
+      "  settings = {",
+      "    ${1:truncate = true},",
+      "  },",
+      "})"
+    ],
+    "description": "Focused window title provider."
+  },
+  "zbar cpu provider": {
+    "prefix": "zbar-cpu",
+    "body": [
+      "zbar.provider.cpu({",
+      "  format = \"cpu {usage}%\",",
+      "  settings = {",
+      "    ${2:usage = 0},",
+      "    ${3:sample_window = 4},",
+      "  },",
+      "})"
+    ],
+    "description": "CPU usage provider."
+  },
+  "zbar memory provider": {
+    "prefix": "zbar-memory",
+    "body": [
+      "zbar.provider.memory({",
+      "  format = \"mem {used_gib:.1}G\",",
+      "  settings = {",
+      "    ${2:unit = \"gib\"},",
+      "    ${3:used_gib = 0.0},",
+      "    ${4:used_mib = 0},",
+      "  },",
+      "})"
+    ],
+    "description": "Memory usage provider."
+  },
+  "zbar clock provider": {
+    "prefix": "zbar-clock",
+    "body": [
+      "zbar.provider.clock({",
+      "  format = \"{timestamp}\",",
+      "  settings = {",
+      "    ${2:timezone = \"local\"},",
+      "  },",
+      "})"
+    ],
+    "description": "Clock provider."
+  }
+}
