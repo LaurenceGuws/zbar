@@ -23,6 +23,13 @@ pub const StrokeRect = struct {
     color: style.Rgba,
 };
 
+pub const PushClipRect = struct {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+};
+
 pub const DrawText = struct {
     pub const HorizontalAlign = enum {
         start,
@@ -53,12 +60,14 @@ pub const DrawText = struct {
     color: style.Rgba,
     horizontal_align: HorizontalAlign = .center,
     vertical_align: VerticalAlign = .middle,
-    overflow: Overflow = .clip,
+    overflow: Overflow = .allow,
 };
 
 pub const Command = union(enum) {
     fill_rect: FillRect,
     stroke_rect: StrokeRect,
+    push_clip_rect: PushClipRect,
+    pop_clip_rect: void,
     draw_text: DrawText,
 };
 
@@ -115,7 +124,7 @@ pub fn fromLayoutFrame(
 fn countCommands(frame: layout.LayoutFrame, edge_line_px: u16) usize {
     const box_count = frame.left.len + frame.center.len + frame.right.len;
     const edge_count: usize = if (edge_line_px == 0) 0 else 2;
-    return edge_count + (box_count * 3);
+    return edge_count + (box_count * 5);
 }
 
 fn appendEdgeTreatments(
@@ -180,6 +189,14 @@ fn appendBoxes(commands: []Command, index: *usize, boxes: []const layout.Segment
         } };
         index.* += 1;
 
+        commands[index.*] = .{ .push_clip_rect = .{
+            .x = box.x,
+            .y = box.y,
+            .width = box.width,
+            .height = box.height,
+        } };
+        index.* += 1;
+
         commands[index.*] = .{ .draw_text = .{
             .text = box.text,
             .box_x = box.x,
@@ -193,8 +210,11 @@ fn appendBoxes(commands: []Command, index: *usize, boxes: []const layout.Segment
             .color = box.appearance.foreground,
             .horizontal_align = .center,
             .vertical_align = .middle,
-            .overflow = .clip,
+            .overflow = .allow,
         } };
+        index.* += 1;
+
+        commands[index.*] = .{ .pop_clip_rect = {} };
         index.* += 1;
     }
 }
@@ -243,7 +263,7 @@ test "fromLayoutFrame emits rect and text commands per segment" {
     );
     defer draw_list.deinit(allocator);
 
-    try std.testing.expectEqual(@as(usize, 5), draw_list.commands.len);
+    try std.testing.expectEqual(@as(usize, 7), draw_list.commands.len);
     try std.testing.expectEqualDeep(Command{ .fill_rect = .{
         .x = 0,
         .y = 0,
@@ -283,6 +303,12 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .line_width = 1.5,
         .color = .{ .r = 44, .g = 45, .b = 46, .a = 200 },
     } }, draw_list.commands[3]);
+    try std.testing.expectEqualDeep(Command{ .push_clip_rect = .{
+        .x = 10,
+        .y = 5,
+        .width = 80,
+        .height = 24,
+    } }, draw_list.commands[4]);
     try std.testing.expectEqualDeep(Command{ .draw_text = .{
         .text = "cpu 5%",
         .box_x = 10,
@@ -296,6 +322,7 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .color = .{ .r = 211, .g = 212, .b = 213, .a = 255 },
         .horizontal_align = .center,
         .vertical_align = .middle,
-        .overflow = .clip,
-    } }, draw_list.commands[4]);
+        .overflow = .allow,
+    } }, draw_list.commands[5]);
+    try std.testing.expectEqualDeep(Command{ .pop_clip_rect = {} }, draw_list.commands[6]);
 }

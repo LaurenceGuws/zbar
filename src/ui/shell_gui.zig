@@ -186,6 +186,18 @@ const PreviewUi = struct {
                     try sdlBool(c.SDL_RenderRect(self.renderer, &sdl_rect));
                 }
             },
+            .push_clip_rect => |clip| {
+                const sdl_clip = c.SDL_Rect{
+                    .x = @intFromFloat(@round(clip.x)),
+                    .y = @intFromFloat(@round(clip.y)),
+                    .w = @intFromFloat(@round(clip.width)),
+                    .h = @intFromFloat(@round(clip.height)),
+                };
+                _ = c.SDL_SetRenderClipRect(self.renderer, &sdl_clip);
+            },
+            .pop_clip_rect => {
+                _ = c.SDL_SetRenderClipRect(self.renderer, null);
+            },
             .draw_text => |text| {
                 const rendered = try self.renderText(text.text, toColor(text.color));
                 defer rendered.deinit(self.renderer);
@@ -195,16 +207,6 @@ const PreviewUi = struct {
                     .w = rendered.width,
                     .h = rendered.height,
                 };
-                if (text.overflow == .clip) {
-                    const clip = c.SDL_Rect{
-                        .x = @intFromFloat(@round(text.box_x)),
-                        .y = @intFromFloat(@round(text.box_y)),
-                        .w = @intFromFloat(@round(text.box_width)),
-                        .h = @intFromFloat(@round(text.box_height)),
-                    };
-                    _ = c.SDL_SetRenderClipRect(self.renderer, &clip);
-                    defer _ = c.SDL_SetRenderClipRect(self.renderer, null);
-                }
                 try sdlBool(c.SDL_RenderTexture(self.renderer, rendered.texture, null, &dst));
             },
         };

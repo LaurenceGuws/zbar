@@ -805,22 +805,24 @@ const Buffer = struct {
             .stroke_rect => |rect| {
                 drawStrokeRect(cr, rect);
             },
+            .push_clip_rect => |clip| {
+                c.cairo_save(cr);
+                c.cairo_rectangle(
+                    cr,
+                    clip.x,
+                    clip.y,
+                    clip.width,
+                    clip.height,
+                );
+                c.cairo_clip(cr);
+            },
+            .pop_clip_rect => {
+                c.cairo_restore(cr);
+            },
             .draw_text => |text| {
                 paintColor(cr, text.color);
                 const baseline_y = textBaselineY(text, font_extents);
                 const x = ui_paint.alignedTextX(text, text.width);
-                if (text.overflow == .clip) {
-                    c.cairo_save(cr);
-                    c.cairo_rectangle(
-                        cr,
-                        text.box_x,
-                        text.box_y,
-                        text.box_width,
-                        text.box_height,
-                    );
-                    c.cairo_clip(cr);
-                    defer c.cairo_restore(cr);
-                }
                 c.cairo_move_to(cr, snapPixel(x), snapBaseline(baseline_y));
                 _ = c.cairo_show_text(cr, text.text.ptr);
             },
