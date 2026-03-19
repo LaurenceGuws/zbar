@@ -2,11 +2,11 @@
 
 ## Near Term
 
-- real Wayland layer-shell backend
+- input handling on shared scene hit targets
+- action dispatch hardening
 - provider invalidation and event handling hardening
-- richer formatter capabilities
 - config reload workflow
-- stronger smoke and CI coverage
+- stronger smoke coverage
 
 ## Mid Term
 
