@@ -13,10 +13,18 @@ pub const Mode = enum {
 };
 
 pub const RunOptions = struct {
+    pub const UiBackend = enum {
+        auto,
+        sdl,
+        layer_shell,
+        headless,
+    };
+
     once: bool = false,
     max_frames: ?u32 = null,
     tick_ms_override: ?u64 = null,
     debug_runtime: bool = false,
+    ui_backend: UiBackend = .auto,
 
     pub fn tickMs(self: RunOptions) u64 {
         return self.tick_ms_override orelse 1000;
@@ -40,7 +48,7 @@ pub const App = struct {
         var registry = modules.Registry.default();
         defer registry.deinit(std.heap.page_allocator);
         const renderer = render.Renderer.init();
-        var shell = ui.Shell.init(runtime_cfg, runtime_bar, backend, &registry, renderer, options);
+        var shell = try ui.Shell.init(runtime_cfg, runtime_bar, backend, &registry, renderer, options);
 
         try shell.run();
     }

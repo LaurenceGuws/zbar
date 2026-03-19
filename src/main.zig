@@ -31,6 +31,11 @@ pub fn main() !void {
         return;
     }
 
+    if (hasArg(args, "--print-ui-capabilities")) {
+        try zbar.ui.printLayerShellCapabilities();
+        return;
+    }
+
     if (hasArg(args, "--lint-config")) {
         try lintConfig(args, false);
         return;
@@ -64,12 +69,14 @@ fn printUsage() !void {
     try out.print("  --print-integration-plan  Print sibling integration targets\n", .{});
     try out.print("  --print-provider-health   Print provider health snapshot\n", .{});
     try out.print("  --print-runtime-stats    Print scheduler/cache runtime snapshot\n", .{});
+    try out.print("  --print-ui-capabilities  Print layer-shell/ui environment readiness\n", .{});
     try out.print("  --lint-config            Validate config against schema\n", .{});
     try out.print("  --lint-config-strict     Validate config and exit non-zero on issues\n", .{});
     try out.print("  --config <path>          Use an explicit Lua config file\n", .{});
     try out.print("  --once                   Render one frame and exit\n", .{});
     try out.print("  --frames <n>             Render n frames and exit\n", .{});
     try out.print("  --tick-ms <n>            Override redraw interval in milliseconds\n", .{});
+    try out.print("  --ui-backend <name>      Select ui backend: auto|sdl|layer-shell|headless\n", .{});
     try out.print("  --debug-runtime          Print per-frame scheduler stats to stderr\n", .{});
     try out.flush();
 }
@@ -161,9 +168,20 @@ fn parseRunOptions(args: []const []const u8) zbar.app.RunOptions {
     if (argValueAfterFlag(args, "--tick-ms")) |value| {
         options.tick_ms_override = std.fmt.parseInt(u64, value, 10) catch options.tick_ms_override;
     }
+    if (argValueAfterFlag(args, "--ui-backend")) |value| {
+        options.ui_backend = parseUiBackend(value) orelse options.ui_backend;
+    }
     options.debug_runtime = hasArg(args, "--debug-runtime");
     if (options.once and options.max_frames == null) options.max_frames = 1;
     return options;
+}
+
+fn parseUiBackend(value: []const u8) ?zbar.app.RunOptions.UiBackend {
+    if (std.mem.eql(u8, value, "auto")) return .auto;
+    if (std.mem.eql(u8, value, "sdl")) return .sdl;
+    if (std.mem.eql(u8, value, "layer-shell")) return .layer_shell;
+    if (std.mem.eql(u8, value, "headless")) return .headless;
+    return null;
 }
 
 test "hasArg detects present flag" {
@@ -177,9 +195,10 @@ test "argValueAfterFlag returns following argument" {
 }
 
 test "parseRunOptions reads flags" {
-    const args = [_][]const u8{ "zbar", "--frames", "3", "--tick-ms", "50", "--debug-runtime" };
+    const args = [_][]const u8{ "zbar", "--frames", "3", "--tick-ms", "50", "--debug-runtime", "--ui-backend", "headless" };
     const options = parseRunOptions(&args);
     try std.testing.expectEqual(@as(?u32, 3), options.max_frames);
     try std.testing.expectEqual(@as(?u64, 50), options.tick_ms_override);
     try std.testing.expect(options.debug_runtime);
+    try std.testing.expectEqual(zbar.app.RunOptions.UiBackend.headless, options.ui_backend);
 }

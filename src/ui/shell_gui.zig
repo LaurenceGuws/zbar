@@ -6,6 +6,7 @@ const render = @import("../render/mod.zig");
 const ui_layout = @import("layout.zig");
 const ui_paint = @import("paint.zig");
 const ui_presenter = @import("presenter.zig");
+const ui_runtime = @import("runtime.zig");
 const ui_surface = @import("surface.zig");
 const ui_style = @import("style.zig");
 const ui_text = @import("text.zig");
@@ -45,57 +46,19 @@ pub const Shell = struct {
     pub fn run(self: *Shell) !void {
         var ui = try PreviewUi.init(self.runtime_bar);
         defer ui.deinit();
+        const state = self.runtimeState();
+        try ui_runtime.runShell(&state, ui.hooks());
+    }
 
-        var frame_index: u32 = 0;
-        var previous_snapshot: ?wm.Snapshot = null;
-        var previous_signature: ?render.Renderer.Signature = null;
-        var redraw_count: usize = 0;
-        var suppressed_count: usize = 0;
-
-        while (!ui.should_quit) : (frame_index += 1) {
-            ui.pollEvents();
-
-            const snapshot = self.backend.snapshot();
-            const snapshot_changed = if (previous_snapshot) |prior| !wm.Snapshot.eql(prior, snapshot) else true;
-            const frame = try self.registry.collect(std.heap.page_allocator, self.cfg.bar, .{
-                .snapshot = snapshot,
-                .snapshot_changed = snapshot_changed,
-                .provider_defaults = self.cfg.provider_defaults,
-            });
-            defer frame.deinit(std.heap.page_allocator);
-            previous_snapshot = snapshot;
-
-            const signature = self.renderer.signature(self.runtime_bar, snapshot, frame);
-            const prior_signature = previous_signature;
-            const changed = prior_signature == null or prior_signature.?.full() != signature.full();
-            if (changed) {
-                redraw_count += 1;
-                try ui.draw(self.runtime_bar, frame);
-                previous_signature = signature;
-            } else {
-                suppressed_count += 1;
-            }
-
-            if (self.options.debug_runtime) {
-                try printRuntimeDebug(
-                    self.cfg.bar.effectiveTickMs(),
-                    self.registry,
-                    self.options,
-                    frame_index,
-                    redraw_count,
-                    suppressed_count,
-                    changed,
-                    signature,
-                    prior_signature,
-                );
-            }
-
-            if (self.options.once) break;
-            if (self.options.max_frames) |limit| {
-                if (frame_index + 1 >= limit) break;
-            }
-            self.backend.waitForChange(sleepMs(self.options, self.registry, self.cfg.bar.effectiveTickMs()));
-        }
+    fn runtimeState(self: *Shell) ui_runtime.ShellState {
+        return .{
+            .cfg = self.cfg,
+            .runtime_bar = self.runtime_bar,
+            .backend = self.backend,
+            .registry = self.registry,
+            .renderer = self.renderer,
+            .options = self.options,
+        };
     }
 };
 
@@ -173,6 +136,32 @@ const PreviewUi = struct {
         try self.executeDrawList(scene.draw_list);
 
         try sdlBool(c.SDL_RenderPresent(self.renderer));
+    }
+
+    fn hooks(self: *PreviewUi) ui_runtime.Hooks {
+        return .{
+            .context = @ptrCast(self),
+            .vtable = &.{
+                .isQuitRequested = isQuitRequested,
+                .beforeFrame = beforeFrame,
+                .drawFrame = drawFrame,
+            },
+        };
+    }
+
+    fn isQuitRequested(context: *anyopaque) bool {
+        const self: *PreviewUi = @ptrCast(@alignCast(context));
+        return self.should_quit;
+    }
+
+    fn beforeFrame(context: *anyopaque) void {
+        const self: *PreviewUi = @ptrCast(@alignCast(context));
+        self.pollEvents();
+    }
+
+    fn drawFrame(context: *anyopaque, runtime_bar: bar.Bar, frame: modules.Frame) !void {
+        const self: *PreviewUi = @ptrCast(@alignCast(context));
+        try self.draw(runtime_bar, frame);
     }
 
     fn executeDrawList(self: *PreviewUi, draw_list: ui_paint.DrawList) !void {
@@ -277,15 +266,6 @@ fn toColor(rgba: ui_style.Rgba) Color {
     return .{ .r = rgba.r, .g = rgba.g, .b = rgba.b, .a = rgba.a };
 }
 
-fn sdlBool(ok: bool) !void {
-    if (!ok) return error.SdlCallFailed;
-}
-
-fn sleepMs(options: RunOptions, registry: *modules.Registry, fallback_ms: u64) u64 {
-    if (options.tick_ms_override) |tick_ms| return tick_ms;
-    return registry.nextWakeDelayMs(fallback_ms);
-}
-
 fn applySurfacePlacement(window: *c.SDL_Window, surface: ui_surface.SurfaceSpec) void {
     const display_mode = c.SDL_GetDesktopDisplayMode(c.SDL_GetPrimaryDisplay());
     if (display_mode == null) return;
@@ -307,48 +287,6 @@ fn applySurfacePlacement(window: *c.SDL_Window, surface: ui_surface.SurfaceSpec)
 
     _ = c.SDL_SetWindowPosition(window, x, y);
 }
-
-fn printRuntimeDebug(
-    fallback_ms: u64,
-    registry: *modules.Registry,
-    options: RunOptions,
-    frame_index: u32,
-    redraw_count: usize,
-    suppressed_count: usize,
-    changed: bool,
-    signature: render.Renderer.Signature,
-    previous_signature: ?render.Renderer.Signature,
-) !void {
-    const stats = registry.runtimeStats(fallback_ms);
-    const sleep_ms = if (options.tick_ms_override) |tick_ms| tick_ms else stats.next_wake_delay_ms orelse fallback_ms;
-    const layout_changed = previous_signature == null or previous_signature.?.layout != signature.layout;
-    const display_changed = previous_signature == null or previous_signature.?.display_content != signature.display_content;
-    const semantic_changed = previous_signature == null or previous_signature.?.semantic_content != signature.semantic_content;
-
-    var buffer: [256]u8 = undefined;
-    var writer = std.fs.File.stderr().writer(&buffer);
-    const err = &writer.interface;
-    try err.print(
-        "debug frame={d} redraw={s} layout_changed={s} display_changed={s} semantic_changed={s} redraw_count={d} suppressed={d} cache={d} hits={d} misses={d} timed_hits={d} timed_misses={d} snapshot_hits={d} snapshot_misses={d} timed={d} snapshot={d} sleep_ms={d}\n",
-        .{
-            frame_index + 1,
-            if (changed) "yes" else "no",
-            if (layout_changed) "yes" else "no",
-            if (display_changed) "yes" else "no",
-            if (semantic_changed) "yes" else "no",
-            redraw_count,
-            suppressed_count,
-            stats.cache_entries,
-            stats.cache_hits,
-            stats.cache_misses,
-            stats.timed_cache_hits,
-            stats.timed_cache_misses,
-            stats.snapshot_cache_hits,
-            stats.snapshot_cache_misses,
-            stats.timed_entries,
-            stats.snapshot_entries,
-            sleep_ms,
-        },
-    );
-    try err.flush();
+fn sdlBool(ok: bool) !void {
+    if (!ok) return error.SdlCallFailed;
 }
