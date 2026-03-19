@@ -822,8 +822,8 @@ const Buffer = struct {
             .draw_text => |text| {
                 paintColor(cr, text.color);
                 const baseline_y = textBaselineY(text, font_extents);
-                const x = ui_paint.alignedTextX(text, text.width);
-                c.cairo_move_to(cr, snapPixel(x), snapBaseline(baseline_y));
+                const bounds = ui_paint.textContentRect(text, text.width, text.height);
+                c.cairo_move_to(cr, snapPixel(bounds.x), snapBaseline(baseline_y));
                 _ = c.cairo_show_text(cr, text.text.ptr);
             },
         };

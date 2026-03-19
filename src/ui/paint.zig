@@ -63,6 +63,13 @@ pub const DrawText = struct {
     overflow: Overflow = .allow,
 };
 
+pub const Rect = struct {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+};
+
 pub const Command = union(enum) {
     fill_rect: FillRect,
     stroke_rect: StrokeRect,
@@ -96,6 +103,15 @@ pub fn alignedTextY(text: DrawText, content_height: f32) f32 {
         .top => text.box_y,
         .middle => text.box_y + @max((text.box_height - content_height) * 0.5, 0),
         .bottom => text.box_y + @max(text.box_height - content_height, 0),
+    };
+}
+
+pub fn textContentRect(text: DrawText, content_width: f32, content_height: f32) Rect {
+    return .{
+        .x = alignedTextX(text, content_width),
+        .y = alignedTextY(text, content_height),
+        .width = content_width,
+        .height = content_height,
     };
 }
 
