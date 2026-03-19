@@ -70,6 +70,26 @@ pub const DrawList = struct {
     }
 };
 
+pub fn effectiveRadius(width: f32, height: f32, radius: f32) f32 {
+    return @min(radius, @min(width, height) * 0.5);
+}
+
+pub fn alignedTextX(text: DrawText, content_width: f32) f32 {
+    return switch (text.horizontal_align) {
+        .start => text.box_x,
+        .center => text.box_x + @max((text.box_width - content_width) * 0.5, 0),
+        .end => text.box_x + @max(text.box_width - content_width, 0),
+    };
+}
+
+pub fn alignedTextY(text: DrawText, content_height: f32) f32 {
+    return switch (text.vertical_align) {
+        .top => text.box_y,
+        .middle => text.box_y + @max((text.box_height - content_height) * 0.5, 0),
+        .bottom => text.box_y + @max(text.box_height - content_height, 0),
+    };
+}
+
 pub fn fromLayoutFrame(
     allocator: std.mem.Allocator,
     frame: layout.LayoutFrame,

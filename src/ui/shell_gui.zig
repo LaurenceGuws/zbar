@@ -190,8 +190,8 @@ const PreviewUi = struct {
                 const rendered = try self.renderText(text.text, toColor(text.color));
                 defer rendered.deinit(self.renderer);
                 const dst = c.SDL_FRect{
-                    .x = alignedX(text, rendered.width),
-                    .y = alignedY(text, rendered.height),
+                    .x = ui_paint.alignedTextX(text, rendered.width),
+                    .y = ui_paint.alignedTextY(text, rendered.height),
                     .w = rendered.width,
                     .h = rendered.height,
                 };
@@ -211,7 +211,7 @@ const PreviewUi = struct {
     }
 
     fn renderRoundedFill(self: *PreviewUi, rect: ui_paint.FillRect) !void {
-        const radius = effectiveRadius(rect.width, rect.height, rect.corner_radius);
+        const radius = ui_paint.effectiveRadius(rect.width, rect.height, rect.corner_radius);
         const diameter = radius * 2.0;
         const center_w = @max(rect.width - diameter, 0);
         const center_h = @max(rect.height - diameter, 0);
@@ -231,7 +231,7 @@ const PreviewUi = struct {
 
     fn renderRoundedStroke(self: *PreviewUi, rect: ui_paint.StrokeRect) !void {
         if (rect.line_width <= 0) return;
-        const radius = effectiveRadius(rect.width, rect.height, rect.corner_radius);
+        const radius = ui_paint.effectiveRadius(rect.width, rect.height, rect.corner_radius);
         if (radius <= 0) {
             const sdl_rect = c.SDL_FRect{ .x = rect.x, .y = rect.y, .w = rect.width, .h = rect.height };
             try sdlBool(c.SDL_RenderRect(self.renderer, &sdl_rect));
@@ -411,26 +411,6 @@ fn openFont(runtime_bar: bar.Bar) !*c.TTF_Font {
 
 fn toColor(rgba: ui_style.Rgba) Color {
     return .{ .r = rgba.r, .g = rgba.g, .b = rgba.b, .a = rgba.a };
-}
-
-fn effectiveRadius(width: f32, height: f32, radius: f32) f32 {
-    return @min(radius, @min(width, height) * 0.5);
-}
-
-fn alignedX(text: ui_paint.DrawText, content_width: f32) f32 {
-    return switch (text.horizontal_align) {
-        .start => text.box_x,
-        .center => text.box_x + @max((text.box_width - content_width) * 0.5, 0),
-        .end => text.box_x + @max(text.box_width - content_width, 0),
-    };
-}
-
-fn alignedY(text: ui_paint.DrawText, content_height: f32) f32 {
-    return switch (text.vertical_align) {
-        .top => text.box_y,
-        .middle => text.box_y + @max((text.box_height - content_height) * 0.5, 0),
-        .bottom => text.box_y + @max(text.box_height - content_height, 0),
-    };
 }
 
 fn applySurfacePlacement(window: *c.SDL_Window, surface: ui_surface.SurfaceSpec) void {

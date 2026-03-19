@@ -4,6 +4,7 @@ const config = @import("../config/mod.zig");
 const modules = @import("../modules/mod.zig");
 const render = @import("../render/mod.zig");
 const ui_presenter = @import("presenter.zig");
+const ui_paint = @import("paint.zig");
 const ui_runtime = @import("runtime.zig");
 const ui_style = @import("style.zig");
 const ui_text = @import("text.zig");
@@ -807,7 +808,7 @@ const Buffer = struct {
             .draw_text => |text| {
                 paintColor(cr, text.color);
                 const baseline_y = textBaselineY(text, font_extents);
-                const x = alignedX(text);
+                const x = ui_paint.alignedTextX(text, text.width);
                 if (text.overflow == .clip) {
                     c.cairo_save(cr);
                     c.cairo_rectangle(
@@ -866,24 +867,12 @@ fn textBaselineY(text: @import("paint.zig").DrawText, font_extents: c.cairo_font
     const ascent = @as(f32, @floatCast(font_extents.ascent));
     const descent = @as(f32, @floatCast(font_extents.descent));
     const content_height = ascent + descent;
-    const top = switch (text.vertical_align) {
-        .top => text.box_y,
-        .middle => text.box_y + @max((text.box_height - content_height) * 0.5, 0),
-        .bottom => text.box_y + @max(text.box_height - content_height, 0),
-    };
+    const top = ui_paint.alignedTextY(text, content_height);
     return @as(f64, top + ascent);
 }
 
-fn alignedX(text: @import("paint.zig").DrawText) f32 {
-    return switch (text.horizontal_align) {
-        .start => text.box_x,
-        .center => text.box_x + @max((text.box_width - text.width) * 0.5, 0),
-        .end => text.box_x + @max(text.box_width - text.width, 0),
-    };
-}
-
 fn roundedRectangle(cr: *c.cairo_t, x: f64, y: f64, width: f64, height: f64, radius: f64) void {
-    const effective_radius = @min(radius, @min(width, height) * 0.5);
+    const effective_radius = ui_paint.effectiveRadius(@floatCast(width), @floatCast(height), @floatCast(radius));
     const right = x + width;
     const bottom = y + height;
 
