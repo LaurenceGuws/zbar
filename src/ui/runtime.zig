@@ -3,6 +3,7 @@ const bar = @import("../bar/mod.zig");
 const config = @import("../config/mod.zig");
 const modules = @import("../modules/mod.zig");
 const render = @import("../render/mod.zig");
+const ui_paint = @import("paint.zig");
 const wm = @import("../wm/mod.zig");
 const RunOptions = @import("../app/state.zig").RunOptions;
 
@@ -44,6 +45,7 @@ pub const Hooks = struct {
         drawFrame: *const fn (context: *anyopaque, runtime_bar: bar.Bar, frame: modules.Frame) anyerror!void,
         forceRedraw: ?*const fn (context: *anyopaque) bool = null,
         redrawReason: ?*const fn (context: *anyopaque) ?[]const u8 = null,
+        sceneStats: ?*const fn (context: *anyopaque) ?ui_paint.Stats = null,
         wait: ?*const fn (context: *anyopaque, timeout_ms: u64) void = null,
     };
 
@@ -69,6 +71,13 @@ pub const Hooks = struct {
     pub fn redrawReason(self: Hooks) ?[]const u8 {
         if (self.vtable.redrawReason) |reason_fn| {
             return reason_fn(self.context);
+        }
+        return null;
+    }
+
+    pub fn sceneStats(self: Hooks) ?ui_paint.Stats {
+        if (self.vtable.sceneStats) |stats_fn| {
+            return stats_fn(self.context);
         }
         return null;
     }
@@ -106,7 +115,7 @@ pub fn runShell(state: *const ShellState, hooks: Hooks) !void {
         }
 
         if (state.options.debug_runtime) {
-            try printRuntimeDebug(state, frame_context, stats, should_redraw);
+            try printRuntimeDebug(state, frame_context, stats, should_redraw, hooks.sceneStats());
         }
 
         if (state.options.once) break;
@@ -160,6 +169,7 @@ pub fn printRuntimeDebug(
     frame_context: FrameContext,
     stats: LoopStats,
     did_redraw: bool,
+    scene_stats: ?ui_paint.Stats,
 ) !void {
     const runtime_stats = state.registry.runtimeStats(state.cfg.bar.effectiveTickMs());
     const sleep_ms = if (state.options.tick_ms_override) |tick_ms| tick_ms else runtime_stats.next_wake_delay_ms orelse state.cfg.bar.effectiveTickMs();
@@ -172,7 +182,7 @@ pub fn printRuntimeDebug(
     var writer = std.fs.File.stderr().writer(&buffer);
     const err = &writer.interface;
     try err.print(
-        "debug frame={d} redraw={s} redraw_reason={s} snapshot_changed={s} snapshot_reason={s} layout_changed={s} display_changed={s} semantic_changed={s} redraw_count={d} suppressed={d} cache={d} hits={d} misses={d} timed_hits={d} timed_misses={d} snapshot_hits={d} snapshot_misses={d} timed={d} snapshot={d} sleep_ms={d}\n",
+        "debug frame={d} redraw={s} redraw_reason={s} snapshot_changed={s} snapshot_reason={s} layout_changed={s} display_changed={s} semantic_changed={s} redraw_count={d} suppressed={d} cache={d} hits={d} misses={d} timed_hits={d} timed_misses={d} snapshot_hits={d} snapshot_misses={d} timed={d} snapshot={d} scene_cmds={d} fills={d} strokes={d} clips={d}/{d} text={d} sleep_ms={d}\n",
         .{
             frame_context.index + 1,
             if (did_redraw) "yes" else "no",
@@ -193,6 +203,12 @@ pub fn printRuntimeDebug(
             runtime_stats.snapshot_cache_misses,
             runtime_stats.timed_entries,
             runtime_stats.snapshot_entries,
+            if (scene_stats) |s| s.total_commands else 0,
+            if (scene_stats) |s| s.fill_rects else 0,
+            if (scene_stats) |s| s.stroke_rects else 0,
+            if (scene_stats) |s| s.push_clips else 0,
+            if (scene_stats) |s| s.pop_clips else 0,
+            if (scene_stats) |s| s.text_draws else 0,
             sleep_ms,
         },
     );

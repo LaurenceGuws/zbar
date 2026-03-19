@@ -67,6 +67,7 @@ const PreviewUi = struct {
     renderer: *c.SDL_Renderer,
     font: *c.TTF_Font,
     should_quit: bool = false,
+    last_scene_stats: ?ui_paint.Stats = null,
 
     fn init(runtime_bar: bar.Bar) !PreviewUi {
         const surface = ui_surface.SurfaceSpec.init(runtime_bar);
@@ -128,6 +129,7 @@ const PreviewUi = struct {
             frame,
         );
         defer scene.deinit(std.heap.page_allocator);
+        self.last_scene_stats = scene.stats;
         const background = toColor(scene.clear_color);
         try sdlBool(c.SDL_SetRenderDrawColor(self.renderer, background.r, background.g, background.b, background.a));
         try sdlBool(c.SDL_RenderClear(self.renderer));
@@ -144,6 +146,7 @@ const PreviewUi = struct {
                 .isQuitRequested = isQuitRequested,
                 .beforeFrame = beforeFrame,
                 .drawFrame = drawFrame,
+                .sceneStats = sceneStats,
             },
         };
     }
@@ -161,6 +164,11 @@ const PreviewUi = struct {
     fn drawFrame(context: *anyopaque, runtime_bar: bar.Bar, frame: modules.Frame) !void {
         const self: *PreviewUi = @ptrCast(@alignCast(context));
         try self.draw(runtime_bar, frame);
+    }
+
+    fn sceneStats(context: *anyopaque) ?ui_paint.Stats {
+        const self: *PreviewUi = @ptrCast(@alignCast(context));
+        return self.last_scene_stats;
     }
 
     fn executeDrawList(self: *PreviewUi, draw_list: ui_paint.DrawList) !void {

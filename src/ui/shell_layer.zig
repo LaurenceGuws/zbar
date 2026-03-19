@@ -110,6 +110,7 @@ const LayerUi = struct {
     backend: wm.Backend,
     redraw_reason_buffer: [32]u8 = undefined,
     last_redraw_reason: ?[]const u8 = null,
+    last_scene_stats: ?ui_paint.Stats = null,
     text_measurer: CairoTextMeasurer,
 
     fn init(runtime_bar: bar.Bar, backend: wm.Backend) !LayerUi {
@@ -139,6 +140,7 @@ const LayerUi = struct {
                 .drawFrame = drawFrame,
                 .forceRedraw = forceRedraw,
                 .redrawReason = redrawReason,
+                .sceneStats = sceneStats,
                 .wait = waitForNextEvent,
             },
         };
@@ -157,6 +159,7 @@ const LayerUi = struct {
     fn drawFrame(context: *anyopaque, runtime_bar: bar.Bar, frame: modules.Frame) !void {
         const self: *LayerUi = @ptrCast(@alignCast(context));
         try self.client.presentFrame(self.text_measurer.measurer(), frame, runtime_bar);
+        self.last_scene_stats = self.client.last_scene_stats;
     }
 
     fn forceRedraw(context: *anyopaque) bool {
@@ -169,6 +172,11 @@ const LayerUi = struct {
     fn redrawReason(context: *anyopaque) ?[]const u8 {
         const self: *LayerUi = @ptrCast(@alignCast(context));
         return self.last_redraw_reason;
+    }
+
+    fn sceneStats(context: *anyopaque) ?ui_paint.Stats {
+        const self: *LayerUi = @ptrCast(@alignCast(context));
+        return self.last_scene_stats;
     }
 
     fn waitForNextEvent(context: *anyopaque, timeout_ms: u64) void {
@@ -412,6 +420,7 @@ const LayerClient = struct {
     surface: ?*c.wl_surface = null,
     layer_surface: ?*c.zwlr_layer_surface_v1 = null,
     buffer: ?Buffer = null,
+    last_scene_stats: ?ui_paint.Stats = null,
     surface_state: SurfaceState = .{},
     dirty: DirtyState = .{ .initial = true },
     closed: bool = false,
@@ -514,6 +523,7 @@ const LayerClient = struct {
             frame,
         );
         defer scene.deinit(std.heap.page_allocator);
+        self.last_scene_stats = scene.stats;
         try self.buffer.?.paintScene(scene, runtime_bar, measurer);
 
         self.ackPendingConfigure();

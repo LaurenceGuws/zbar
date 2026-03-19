@@ -29,47 +29,47 @@ end
 ---@type ZbarConfig
 return zbar.config({
   bar = {
-    height_px = 28,
-    section_gap_px = 12,
-    background = "#11161c",
-    foreground = "#d7dee7",
+    height_px = 34,
+    section_gap_px = 18,
+    background = "#0b1220",
+    foreground = "#e6edf7",
     theme = {
-      segment_background = "#2a3139",
-      accent_background = "#275b7a",
-      subtle_background = "#1c232a",
-      warning_background = "#7a4627",
-      accent_foreground = "#eff5fa",
+      segment_background = "#172235",
+      accent_background = "#0f6db2",
+      subtle_background = "#10192a",
+      warning_background = "#8d4b22",
+      accent_foreground = "#f4faff",
       font_path = "/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf",
       font_fallback_path = "/usr/share/fonts/TTF/IosevkaTermNerdFont-Regular.ttf",
       font_fallback_path_2 = "/usr/share/fonts/TTF/Hack-Regular.ttf",
-      preview_width_px = 1280,
+      preview_width_px = 1440,
       anchor = "top",
-      horizontal_padding_px = 18,
-      segment_padding_x_px = 10,
-      segment_padding_y_px = 6,
-      font_points = 15,
-      segment_radius_px = 6,
-      edge_line_px = 1,
-      edge_shadow_alpha = 235,
+      horizontal_padding_px = 26,
+      segment_padding_x_px = 14,
+      segment_padding_y_px = 8,
+      font_points = 16,
+      segment_radius_px = 10,
+      edge_line_px = 2,
+      edge_shadow_alpha = 220,
       segment_border_px = 1,
-      segment_border_alpha = 150,
+      segment_border_alpha = 190,
     },
     left = {
       zbar.provider.workspaces({
         name = "hypr",
-        format = "ws {focused}/{total}",
+        format = "ws {focused:.2}/{total:.2}",
         settings = {
           show_empty = false,
         },
       }),
       zbar.provider.mode({
-        format = "{compositor}",
+        format = "{compositor|upper}",
       }),
     },
     center = {
       zbar.provider.window({
         name = "title",
-        max_width = 96,
+        max_width = 72,
         settings = {
           truncate = true,
         },
@@ -78,9 +78,8 @@ return zbar.config({
     right = {
       zbar.provider.cpu({
         interval_ms = 1000,
-        format = "cpu {usage}%",
+        format = "cpu {usage:.2}%",
         settings = {
-          usage = 12,
           sample_window = 4,
         },
       }),
@@ -89,13 +88,12 @@ return zbar.config({
         format = "mem {used_gib:.1}G",
         settings = {
           unit = "gib",
-          used_gib = 3.5,
         },
       }),
       zbar.provider.clock({
-        name = "unix",
+        name = "local",
         interval_ms = 1000,
-        format = "{timestamp}",
+        format = "{formatted}",
         settings = {
           timezone = "local",
         },
@@ -108,12 +106,10 @@ return zbar.config({
   },
   providers = {
     cpu = {
-      usage = 12,
       sample_window = 4,
     },
     memory = {
       unit = "gib",
-      used_gib = 3.5,
     },
     clock = {
       timezone = "local",
