@@ -172,6 +172,12 @@ const PreviewUi = struct {
                 try sdlBool(c.SDL_SetRenderDrawColor(self.renderer, color.r, color.g, color.b, color.a));
                 try sdlBool(c.SDL_RenderFillRect(self.renderer, &sdl_rect));
             },
+            .stroke_rect => |rect| {
+                const sdl_rect = c.SDL_FRect{ .x = rect.x, .y = rect.y, .w = rect.width, .h = rect.height };
+                const color = toColor(rect.color);
+                try sdlBool(c.SDL_SetRenderDrawColor(self.renderer, color.r, color.g, color.b, color.a));
+                try sdlBool(c.SDL_RenderRect(self.renderer, &sdl_rect));
+            },
             .draw_text => |text| {
                 const rendered = try self.renderText(text.text, toColor(text.color));
                 defer rendered.deinit(self.renderer);

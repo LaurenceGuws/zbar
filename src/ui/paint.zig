@@ -13,6 +13,16 @@ pub const FillRect = struct {
     border_color: style.Rgba,
 };
 
+pub const StrokeRect = struct {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    corner_radius: f32,
+    line_width: f32,
+    color: style.Rgba,
+};
+
 pub const DrawText = struct {
     text: []const u8,
     x: f32,
@@ -24,6 +34,7 @@ pub const DrawText = struct {
 
 pub const Command = union(enum) {
     fill_rect: FillRect,
+    stroke_rect: StrokeRect,
     draw_text: DrawText,
 };
 
@@ -50,7 +61,7 @@ pub fn fromLayoutFrame(allocator: std.mem.Allocator, frame: layout.LayoutFrame) 
 
 fn countCommands(frame: layout.LayoutFrame) usize {
     const box_count = frame.left.len + frame.center.len + frame.right.len;
-    return box_count * 2;
+    return box_count * 3;
 }
 
 fn appendBoxes(commands: []Command, index: *usize, boxes: []const layout.SegmentBox) void {
@@ -64,6 +75,17 @@ fn appendBoxes(commands: []Command, index: *usize, boxes: []const layout.Segment
             .corner_radius = box.appearance.decoration.corner_radius,
             .border_width = box.appearance.decoration.border_width,
             .border_color = box.appearance.decoration.border_color,
+        } };
+        index.* += 1;
+
+        commands[index.*] = .{ .stroke_rect = .{
+            .x = box.x,
+            .y = box.y,
+            .width = box.width,
+            .height = box.height,
+            .corner_radius = box.appearance.decoration.corner_radius,
+            .line_width = box.appearance.decoration.border_width,
+            .color = box.appearance.decoration.border_color,
         } };
         index.* += 1;
 
@@ -115,7 +137,7 @@ test "fromLayoutFrame emits rect and text commands per segment" {
     const draw_list = try fromLayoutFrame(allocator, frame);
     defer draw_list.deinit(allocator);
 
-    try std.testing.expectEqual(@as(usize, 2), draw_list.commands.len);
+    try std.testing.expectEqual(@as(usize, 3), draw_list.commands.len);
     try std.testing.expectEqualDeep(Command{ .fill_rect = .{
         .x = 10,
         .y = 5,
@@ -126,6 +148,15 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .border_width = 1.5,
         .border_color = .{ .r = 44, .g = 45, .b = 46, .a = 200 },
     } }, draw_list.commands[0]);
+    try std.testing.expectEqualDeep(Command{ .stroke_rect = .{
+        .x = 10,
+        .y = 5,
+        .width = 80,
+        .height = 24,
+        .corner_radius = 8,
+        .line_width = 1.5,
+        .color = .{ .r = 44, .g = 45, .b = 46, .a = 200 },
+    } }, draw_list.commands[1]);
     try std.testing.expectEqualDeep(Command{ .draw_text = .{
         .text = "cpu 5%",
         .x = 18,
@@ -133,5 +164,5 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .width = 64,
         .height = 12,
         .color = .{ .r = 211, .g = 212, .b = 213, .a = 255 },
-    } }, draw_list.commands[1]);
+    } }, draw_list.commands[2]);
 }

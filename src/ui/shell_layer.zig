@@ -801,7 +801,9 @@ const Buffer = struct {
                     rect.corner_radius,
                 );
                 _ = c.cairo_fill(cr);
-                drawSegmentBorder(cr, rect);
+            },
+            .stroke_rect => |rect| {
+                drawStrokeRect(cr, rect);
             },
             .draw_text => |text| {
                 paintColor(cr, text.color);
@@ -884,17 +886,17 @@ fn roundedRectangle(cr: *c.cairo_t, x: f64, y: f64, width: f64, height: f64, rad
     c.cairo_close_path(cr);
 }
 
-fn drawSegmentBorder(cr: *c.cairo_t, rect: @import("paint.zig").FillRect) void {
-    if (rect.border_width <= 0 or rect.border_color.a == 0) return;
+fn drawStrokeRect(cr: *c.cairo_t, rect: @import("paint.zig").StrokeRect) void {
+    if (rect.line_width <= 0 or rect.color.a == 0) return;
 
-    paintColor(cr, rect.border_color);
-    c.cairo_set_line_width(cr, rect.border_width);
+    paintColor(cr, rect.color);
+    c.cairo_set_line_width(cr, rect.line_width);
     roundedRectangle(
         cr,
-        snapPixel(rect.x) + (rect.border_width * 0.5),
-        snapPixel(rect.y) + (rect.border_width * 0.5),
-        @max(snapExtent(rect.width) - rect.border_width, 1.0),
-        @max(snapExtent(rect.height) - rect.border_width, 1.0),
+        snapPixel(rect.x) + (rect.line_width * 0.5),
+        snapPixel(rect.y) + (rect.line_width * 0.5),
+        @max(snapExtent(rect.width) - rect.line_width, 1.0),
+        @max(snapExtent(rect.height) - rect.line_width, 1.0),
         rect.corner_radius,
     );
     _ = c.cairo_stroke(cr);
