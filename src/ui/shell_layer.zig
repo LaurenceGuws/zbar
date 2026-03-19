@@ -798,10 +798,10 @@ const Buffer = struct {
                     snapPixel(rect.y),
                     snapExtent(rect.width),
                     snapExtent(rect.height),
-                    @floatFromInt(runtime_bar.segment_radius_px),
+                    rect.corner_radius,
                 );
                 _ = c.cairo_fill(cr);
-                drawSegmentBorder(cr, rect.color, runtime_bar, rect);
+                drawSegmentBorder(cr, rect);
             },
             .draw_text => |text| {
                 paintColor(cr, text.color);
@@ -850,8 +850,8 @@ fn configureCairoRenderQuality(cr: *c.cairo_t) void {
 
 fn drawBarEdgeTreatments(cr: *c.cairo_t, clear_color: ui_style.Rgba, width: u32, height: u32, runtime_bar: bar.Bar) void {
     if (runtime_bar.edge_line_px == 0) return;
-    const top = tintColor(clear_color, 0.16, 220);
-    const bottom = tintColor(clear_color, -0.18, runtime_bar.edge_shadow_alpha);
+    const top = ui_style.tintColor(clear_color, 0.16, 220);
+    const bottom = ui_style.tintColor(clear_color, -0.18, runtime_bar.edge_shadow_alpha);
     const line_height: f64 = @floatFromInt(runtime_bar.edge_line_px);
 
     paintColor(cr, top);
@@ -884,34 +884,18 @@ fn roundedRectangle(cr: *c.cairo_t, x: f64, y: f64, width: f64, height: f64, rad
     c.cairo_close_path(cr);
 }
 
-fn tintColor(color: ui_style.Rgba, amount: f32, alpha: u8) ui_style.Rgba {
-    return .{
-        .r = tintChannel(color.r, amount),
-        .g = tintChannel(color.g, amount),
-        .b = tintChannel(color.b, amount),
-        .a = alpha,
-    };
-}
+fn drawSegmentBorder(cr: *c.cairo_t, rect: @import("paint.zig").FillRect) void {
+    if (rect.border_width <= 0 or rect.border_color.a == 0) return;
 
-fn tintChannel(channel: u8, amount: f32) u8 {
-    const base: f32 = @floatFromInt(channel);
-    const delta = if (amount >= 0) (255.0 - base) * amount else base * amount;
-    return @intFromFloat(std.math.clamp(base + delta, 0, 255));
-}
-
-fn drawSegmentBorder(cr: *c.cairo_t, fill: ui_style.Rgba, runtime_bar: bar.Bar, rect: @import("paint.zig").FillRect) void {
-    if (runtime_bar.segment_border_px == 0 or runtime_bar.segment_border_alpha == 0) return;
-
-    const border = tintColor(fill, 0.18, runtime_bar.segment_border_alpha);
-    paintColor(cr, border);
-    c.cairo_set_line_width(cr, @floatFromInt(runtime_bar.segment_border_px));
+    paintColor(cr, rect.border_color);
+    c.cairo_set_line_width(cr, rect.border_width);
     roundedRectangle(
         cr,
-        snapPixel(rect.x) + (@as(f64, @floatFromInt(runtime_bar.segment_border_px)) * 0.5),
-        snapPixel(rect.y) + (@as(f64, @floatFromInt(runtime_bar.segment_border_px)) * 0.5),
-        @max(snapExtent(rect.width) - @as(f64, @floatFromInt(runtime_bar.segment_border_px)), 1.0),
-        @max(snapExtent(rect.height) - @as(f64, @floatFromInt(runtime_bar.segment_border_px)), 1.0),
-        @floatFromInt(runtime_bar.segment_radius_px),
+        snapPixel(rect.x) + (rect.border_width * 0.5),
+        snapPixel(rect.y) + (rect.border_width * 0.5),
+        @max(snapExtent(rect.width) - rect.border_width, 1.0),
+        @max(snapExtent(rect.height) - rect.border_width, 1.0),
+        rect.corner_radius,
     );
     _ = c.cairo_stroke(cr);
 }

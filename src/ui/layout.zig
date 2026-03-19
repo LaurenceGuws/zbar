@@ -75,14 +75,15 @@ pub fn layoutFrame(
     }
 
     return .{
-        .left = try placeSection(allocator, palette, left, left_x, window_height, metrics),
-        .center = try placeSection(allocator, palette, center, center_x, window_height, metrics),
-        .right = try placeSection(allocator, palette, right, right_x, window_height, metrics),
+        .left = try placeSection(allocator, runtime_bar, palette, left, left_x, window_height, metrics),
+        .center = try placeSection(allocator, runtime_bar, palette, center, center_x, window_height, metrics),
+        .right = try placeSection(allocator, runtime_bar, palette, right, right_x, window_height, metrics),
     };
 }
 
 fn placeSection(
     allocator: std.mem.Allocator,
+    runtime_bar: bar.Bar,
     palette: style.Palette,
     segments: []const MeasuredSegment,
     start_x: f32,
@@ -100,7 +101,7 @@ fn placeSection(
             .provider = segment.provider,
             .instance_name = segment.instance_name,
             .text = segment.text,
-            .appearance = style.resolveAppearance(segment.appearance, palette),
+            .appearance = style.resolveAppearance(segment.appearance, palette, runtime_bar),
             .x = x,
             .y = box_y,
             .width = box_width,
@@ -186,6 +187,7 @@ test "layoutFrame preserves segment style" {
     defer frame.deinit(std.testing.allocator);
     try std.testing.expectEqual(style.AppearanceKind.warning, frame.left[0].appearance.kind);
     try std.testing.expectEqual(@as(u8, 33), frame.left[0].appearance.background.r);
+    try std.testing.expect(frame.left[0].appearance.decoration.border_width >= 0);
 }
 
 fn testPalette() style.Palette {

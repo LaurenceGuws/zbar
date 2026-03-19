@@ -8,6 +8,9 @@ pub const FillRect = struct {
     width: f32,
     height: f32,
     color: style.Rgba,
+    corner_radius: f32,
+    border_width: f32,
+    border_color: style.Rgba,
 };
 
 pub const DrawText = struct {
@@ -58,6 +61,9 @@ fn appendBoxes(commands: []Command, index: *usize, boxes: []const layout.Segment
             .width = box.width,
             .height = box.height,
             .color = box.appearance.background,
+            .corner_radius = box.appearance.decoration.corner_radius,
+            .border_width = box.appearance.decoration.border_width,
+            .border_color = box.appearance.decoration.border_color,
         } };
         index.* += 1;
 
@@ -85,6 +91,11 @@ test "fromLayoutFrame emits rect and text commands per segment" {
                     .kind = .warning,
                     .background = .{ .r = 11, .g = 12, .b = 13, .a = 255 },
                     .foreground = .{ .r = 211, .g = 212, .b = 213, .a = 255 },
+                    .decoration = .{
+                        .corner_radius = 8,
+                        .border_width = 1.5,
+                        .border_color = .{ .r = 44, .g = 45, .b = 46, .a = 200 },
+                    },
                 },
                 .x = 10,
                 .y = 5,
@@ -111,6 +122,9 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .width = 80,
         .height = 24,
         .color = .{ .r = 11, .g = 12, .b = 13, .a = 255 },
+        .corner_radius = 8,
+        .border_width = 1.5,
+        .border_color = .{ .r = 44, .g = 45, .b = 46, .a = 200 },
     } }, draw_list.commands[0]);
     try std.testing.expectEqualDeep(Command{ .draw_text = .{
         .text = "cpu 5%",
