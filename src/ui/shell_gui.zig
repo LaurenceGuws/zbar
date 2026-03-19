@@ -189,7 +189,12 @@ const PreviewUi = struct {
             .draw_text => |text| {
                 const rendered = try self.renderText(text.text, toColor(text.color));
                 defer rendered.deinit(self.renderer);
-                const dst = c.SDL_FRect{ .x = text.x, .y = text.y, .w = text.width, .h = text.height };
+                const dst = c.SDL_FRect{
+                    .x = text.box_x + ((text.box_width - rendered.width) * 0.5),
+                    .y = text.box_y + ((text.box_height - rendered.height) * 0.5),
+                    .w = rendered.width,
+                    .h = rendered.height,
+                };
                 try sdlBool(c.SDL_RenderTexture(self.renderer, rendered.texture, null, &dst));
             },
         };

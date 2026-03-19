@@ -25,6 +25,10 @@ pub const StrokeRect = struct {
 
 pub const DrawText = struct {
     text: []const u8,
+    box_x: f32,
+    box_y: f32,
+    box_width: f32,
+    box_height: f32,
     x: f32,
     y: f32,
     width: f32,
@@ -138,6 +142,10 @@ fn appendBoxes(commands: []Command, index: *usize, boxes: []const layout.Segment
 
         commands[index.*] = .{ .draw_text = .{
             .text = box.text,
+            .box_x = box.x,
+            .box_y = box.y,
+            .box_width = box.width,
+            .box_height = box.height,
             .x = box.text_x,
             .y = box.text_y,
             .width = box.text_width,
@@ -234,6 +242,10 @@ test "fromLayoutFrame emits rect and text commands per segment" {
     } }, draw_list.commands[3]);
     try std.testing.expectEqualDeep(Command{ .draw_text = .{
         .text = "cpu 5%",
+        .box_x = 10,
+        .box_y = 5,
+        .box_width = 80,
+        .box_height = 24,
         .x = 18,
         .y = 9,
         .width = 64,
