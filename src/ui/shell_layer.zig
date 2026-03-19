@@ -782,7 +782,6 @@ const Buffer = struct {
 
         paintColor(cr, scene.clear_color);
         _ = c.cairo_paint(cr);
-        drawBarEdgeTreatments(cr, scene.clear_color, self.width, self.height, runtime_bar);
 
         configureCairoFont(cr, runtime_bar, fontFromMeasurer(measurer));
         configureCairoRenderQuality(cr);
@@ -848,21 +847,6 @@ fn configureCairoRenderQuality(cr: *c.cairo_t) void {
     c.cairo_font_options_set_hint_style(options, c.CAIRO_HINT_STYLE_SLIGHT);
     c.cairo_font_options_set_hint_metrics(options, c.CAIRO_HINT_METRICS_ON);
     c.cairo_set_font_options(cr, options);
-}
-
-fn drawBarEdgeTreatments(cr: *c.cairo_t, clear_color: ui_style.Rgba, width: u32, height: u32, runtime_bar: bar.Bar) void {
-    if (runtime_bar.edge_line_px == 0) return;
-    const top = ui_style.tintColor(clear_color, 0.16, 220);
-    const bottom = ui_style.tintColor(clear_color, -0.18, runtime_bar.edge_shadow_alpha);
-    const line_height: f64 = @floatFromInt(runtime_bar.edge_line_px);
-
-    paintColor(cr, top);
-    c.cairo_rectangle(cr, 0, 0, @floatFromInt(width), line_height);
-    _ = c.cairo_fill(cr);
-
-    paintColor(cr, bottom);
-    c.cairo_rectangle(cr, 0, @floatFromInt(@max(height, runtime_bar.edge_line_px) - runtime_bar.edge_line_px), @floatFromInt(width), line_height);
-    _ = c.cairo_fill(cr);
 }
 
 fn textBaselineY(y: f32, height: f32, font_extents: c.cairo_font_extents_t) f64 {

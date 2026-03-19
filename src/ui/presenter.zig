@@ -46,7 +46,15 @@ pub fn presentFrame(
 
     return .{
         .clear_color = palette.background,
-        .draw_list = try paint.fromLayoutFrame(allocator, layout_frame),
+        .draw_list = try paint.fromLayoutFrame(
+            allocator,
+            layout_frame,
+            palette.background,
+            window_width,
+            window_height,
+            runtime_bar.edge_line_px,
+            runtime_bar.edge_shadow_alpha,
+        ),
     };
 }
 
@@ -102,6 +110,6 @@ test "presentFrame produces a paint scene" {
     const scene = try presentFrame(allocator, runtime_bar, measurer, 1000, 40, frame);
     defer scene.deinit(allocator);
 
-    try std.testing.expectEqual(@as(usize, 2), scene.draw_list.commands.len);
+    try std.testing.expectEqual(@as(usize, 5), scene.draw_list.commands.len);
     try std.testing.expectEqual(@as(u8, 16), scene.clear_color.r);
 }
