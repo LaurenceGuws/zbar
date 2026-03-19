@@ -24,6 +24,18 @@ pub const StrokeRect = struct {
 };
 
 pub const DrawText = struct {
+    pub const HorizontalAlign = enum {
+        start,
+        center,
+        end,
+    };
+
+    pub const VerticalAlign = enum {
+        top,
+        middle,
+        bottom,
+    };
+
     text: []const u8,
     box_x: f32,
     box_y: f32,
@@ -34,6 +46,8 @@ pub const DrawText = struct {
     width: f32,
     height: f32,
     color: style.Rgba,
+    horizontal_align: HorizontalAlign = .center,
+    vertical_align: VerticalAlign = .middle,
 };
 
 pub const Command = union(enum) {
@@ -151,6 +165,8 @@ fn appendBoxes(commands: []Command, index: *usize, boxes: []const layout.Segment
             .width = box.text_width,
             .height = box.text_height,
             .color = box.appearance.foreground,
+            .horizontal_align = .center,
+            .vertical_align = .middle,
         } };
         index.* += 1;
     }
@@ -251,5 +267,7 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .width = 64,
         .height = 12,
         .color = .{ .r = 211, .g = 212, .b = 213, .a = 255 },
+        .horizontal_align = .center,
+        .vertical_align = .middle,
     } }, draw_list.commands[4]);
 }

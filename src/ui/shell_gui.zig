@@ -190,8 +190,8 @@ const PreviewUi = struct {
                 const rendered = try self.renderText(text.text, toColor(text.color));
                 defer rendered.deinit(self.renderer);
                 const dst = c.SDL_FRect{
-                    .x = text.box_x + ((text.box_width - rendered.width) * 0.5),
-                    .y = text.box_y + ((text.box_height - rendered.height) * 0.5),
+                    .x = alignedX(text, rendered.width),
+                    .y = alignedY(text, rendered.height),
                     .w = rendered.width,
                     .h = rendered.height,
                 };
@@ -405,6 +405,22 @@ fn toColor(rgba: ui_style.Rgba) Color {
 
 fn effectiveRadius(width: f32, height: f32, radius: f32) f32 {
     return @min(radius, @min(width, height) * 0.5);
+}
+
+fn alignedX(text: ui_paint.DrawText, content_width: f32) f32 {
+    return switch (text.horizontal_align) {
+        .start => text.box_x,
+        .center => text.box_x + @max((text.box_width - content_width) * 0.5, 0),
+        .end => text.box_x + @max(text.box_width - content_width, 0),
+    };
+}
+
+fn alignedY(text: ui_paint.DrawText, content_height: f32) f32 {
+    return switch (text.vertical_align) {
+        .top => text.box_y,
+        .middle => text.box_y + @max((text.box_height - content_height) * 0.5, 0),
+        .bottom => text.box_y + @max(text.box_height - content_height, 0),
+    };
 }
 
 fn applySurfacePlacement(window: *c.SDL_Window, surface: ui_surface.SurfaceSpec) void {

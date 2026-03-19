@@ -806,8 +806,8 @@ const Buffer = struct {
             },
             .draw_text => |text| {
                 paintColor(cr, text.color);
-                const baseline_y = textBaselineY(text.box_y, text.box_height, font_extents);
-                const x = text.box_x + @max((text.box_width - text.width) * 0.5, 0);
+                const baseline_y = textBaselineY(text, font_extents);
+                const x = alignedX(text);
                 c.cairo_move_to(cr, snapPixel(x), snapBaseline(baseline_y));
                 _ = c.cairo_show_text(cr, text.text.ptr);
             },
@@ -850,12 +850,24 @@ fn configureCairoRenderQuality(cr: *c.cairo_t) void {
     c.cairo_set_font_options(cr, options);
 }
 
-fn textBaselineY(y: f32, height: f32, font_extents: c.cairo_font_extents_t) f64 {
+fn textBaselineY(text: @import("paint.zig").DrawText, font_extents: c.cairo_font_extents_t) f64 {
     const ascent = @as(f32, @floatCast(font_extents.ascent));
     const descent = @as(f32, @floatCast(font_extents.descent));
     const content_height = ascent + descent;
-    const top = y + @max((height - content_height) * 0.5, 0);
+    const top = switch (text.vertical_align) {
+        .top => text.box_y,
+        .middle => text.box_y + @max((text.box_height - content_height) * 0.5, 0),
+        .bottom => text.box_y + @max(text.box_height - content_height, 0),
+    };
     return @as(f64, top + ascent);
+}
+
+fn alignedX(text: @import("paint.zig").DrawText) f32 {
+    return switch (text.horizontal_align) {
+        .start => text.box_x,
+        .center => text.box_x + @max((text.box_width - text.width) * 0.5, 0),
+        .end => text.box_x + @max(text.box_width - text.width, 0),
+    };
 }
 
 fn roundedRectangle(cr: *c.cairo_t, x: f64, y: f64, width: f64, height: f64, radius: f64) void {
