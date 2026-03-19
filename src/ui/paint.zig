@@ -143,6 +143,8 @@ pub fn fromLayoutFrame(
     background: style.Rgba,
     window_width: f32,
     window_height: f32,
+    outer_inset_x: f32,
+    outer_radius: f32,
     edge_line_px: u16,
     edge_shadow_alpha: u8,
 ) !DrawList {
@@ -150,7 +152,8 @@ pub fn fromLayoutFrame(
     const commands = try allocator.alloc(Command, command_count);
     var index: usize = 0;
 
-    appendEdgeTreatments(commands, &index, background, window_width, window_height, edge_line_px, edge_shadow_alpha);
+    appendBarBackground(commands, &index, background, window_width, window_height, outer_inset_x, outer_radius);
+    appendEdgeTreatments(commands, &index, background, window_width, window_height, outer_inset_x, edge_line_px, edge_shadow_alpha);
     appendBoxes(commands, &index, frame.left);
     appendBoxes(commands, &index, frame.center);
     appendBoxes(commands, &index, frame.right);
@@ -161,8 +164,31 @@ pub fn fromLayoutFrame(
 
 fn countCommands(frame: layout.LayoutFrame, edge_line_px: u16) usize {
     const box_count = frame.left.len + frame.center.len + frame.right.len;
-    const edge_count: usize = if (edge_line_px == 0) 0 else 2;
+    const edge_count: usize = if (edge_line_px == 0) 1 else 3;
     return edge_count + (box_count * 5);
+}
+
+fn appendBarBackground(
+    commands: []Command,
+    index: *usize,
+    background: style.Rgba,
+    window_width: f32,
+    window_height: f32,
+    outer_inset_x: f32,
+    outer_radius: f32,
+) void {
+    const inset = @max(outer_inset_x, 0);
+    commands[index.*] = .{ .fill_rect = .{
+        .x = inset,
+        .y = 0,
+        .width = @max(window_width - (inset * 2.0), 1),
+        .height = window_height,
+        .color = background,
+        .corner_radius = outer_radius,
+        .border_width = 0,
+        .border_color = .{ .r = 0, .g = 0, .b = 0, .a = 0 },
+    } };
+    index.* += 1;
 }
 
 fn appendEdgeTreatments(
@@ -171,16 +197,19 @@ fn appendEdgeTreatments(
     background: style.Rgba,
     window_width: f32,
     window_height: f32,
+    outer_inset_x: f32,
     edge_line_px: u16,
     edge_shadow_alpha: u8,
 ) void {
     if (edge_line_px == 0) return;
 
     const line_height: f32 = @floatFromInt(edge_line_px);
+    const inset = @max(outer_inset_x, 0);
+    const width = @max(window_width - (inset * 2.0), 1);
     commands[index.*] = .{ .fill_rect = .{
-        .x = 0,
+        .x = inset,
         .y = 0,
-        .width = window_width,
+        .width = width,
         .height = line_height,
         .color = style.tintColor(background, 0.16, 220),
         .corner_radius = 0,
@@ -190,9 +219,9 @@ fn appendEdgeTreatments(
     index.* += 1;
 
     commands[index.*] = .{ .fill_rect = .{
-        .x = 0,
+        .x = inset,
         .y = @max(window_height - line_height, 0),
-        .width = window_width,
+        .width = width,
         .height = line_height,
         .color = style.tintColor(background, -0.18, edge_shadow_alpha),
         .corner_radius = 0,
@@ -296,32 +325,44 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .{ .r = 16, .g = 17, .b = 18, .a = 255 },
         100,
         30,
+        8,
+        10,
         1,
         180,
     );
     defer draw_list.deinit(allocator);
 
-    try std.testing.expectEqual(@as(usize, 7), draw_list.commands.len);
+    try std.testing.expectEqual(@as(usize, 8), draw_list.commands.len);
     try std.testing.expectEqualDeep(Command{ .fill_rect = .{
-        .x = 0,
+        .x = 8,
         .y = 0,
-        .width = 100,
+        .width = 84,
+        .height = 30,
+        .color = .{ .r = 16, .g = 17, .b = 18, .a = 255 },
+        .corner_radius = 10,
+        .border_width = 0,
+        .border_color = .{ .r = 0, .g = 0, .b = 0, .a = 0 },
+    } }, draw_list.commands[0]);
+    try std.testing.expectEqualDeep(Command{ .fill_rect = .{
+        .x = 8,
+        .y = 0,
+        .width = 84,
         .height = 1,
         .color = style.tintColor(.{ .r = 16, .g = 17, .b = 18, .a = 255 }, 0.16, 220),
         .corner_radius = 0,
         .border_width = 0,
         .border_color = .{ .r = 0, .g = 0, .b = 0, .a = 0 },
-    } }, draw_list.commands[0]);
+    } }, draw_list.commands[1]);
     try std.testing.expectEqualDeep(Command{ .fill_rect = .{
-        .x = 0,
+        .x = 8,
         .y = 29,
-        .width = 100,
+        .width = 84,
         .height = 1,
         .color = style.tintColor(.{ .r = 16, .g = 17, .b = 18, .a = 255 }, -0.18, 180),
         .corner_radius = 0,
         .border_width = 0,
         .border_color = .{ .r = 0, .g = 0, .b = 0, .a = 0 },
-    } }, draw_list.commands[1]);
+    } }, draw_list.commands[2]);
     try std.testing.expectEqualDeep(Command{ .fill_rect = .{
         .x = 10,
         .y = 5,
@@ -331,7 +372,7 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .corner_radius = 8,
         .border_width = 1.5,
         .border_color = .{ .r = 44, .g = 45, .b = 46, .a = 200 },
-    } }, draw_list.commands[2]);
+    } }, draw_list.commands[3]);
     try std.testing.expectEqualDeep(Command{ .stroke_rect = .{
         .x = 10,
         .y = 5,
@@ -340,13 +381,13 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .corner_radius = 8,
         .line_width = 1.5,
         .color = .{ .r = 44, .g = 45, .b = 46, .a = 200 },
-    } }, draw_list.commands[3]);
+    } }, draw_list.commands[4]);
     try std.testing.expectEqualDeep(Command{ .push_clip_rect = .{
         .x = 10,
         .y = 5,
         .width = 80,
         .height = 24,
-    } }, draw_list.commands[4]);
+    } }, draw_list.commands[5]);
     try std.testing.expectEqualDeep(Command{ .draw_text = .{
         .text = "cpu 5%",
         .box_x = 10,
@@ -361,11 +402,11 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .horizontal_align = .center,
         .vertical_align = .middle,
         .overflow = .allow,
-    } }, draw_list.commands[5]);
-    try std.testing.expectEqualDeep(Command{ .pop_clip_rect = {} }, draw_list.commands[6]);
+    } }, draw_list.commands[6]);
+    try std.testing.expectEqualDeep(Command{ .pop_clip_rect = {} }, draw_list.commands[7]);
     const stats = draw_list.stats();
-    try std.testing.expectEqual(@as(usize, 7), stats.total_commands);
-    try std.testing.expectEqual(@as(usize, 3), stats.fill_rects);
+    try std.testing.expectEqual(@as(usize, 8), stats.total_commands);
+    try std.testing.expectEqual(@as(usize, 4), stats.fill_rects);
     try std.testing.expectEqual(@as(usize, 1), stats.stroke_rects);
     try std.testing.expectEqual(@as(usize, 1), stats.push_clips);
     try std.testing.expectEqual(@as(usize, 1), stats.pop_clips);

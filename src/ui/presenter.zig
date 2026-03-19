@@ -51,6 +51,8 @@ pub fn presentFrame(
         palette.background,
         window_width,
         window_height,
+        @as(f32, @floatFromInt(runtime_bar.horizontal_padding_px)) * 0.5,
+        @as(f32, @floatFromInt(runtime_bar.segment_radius_px + 4)),
         runtime_bar.edge_line_px,
         runtime_bar.edge_shadow_alpha,
     );
@@ -113,8 +115,8 @@ test "presentFrame produces a paint scene" {
     const scene = try presentFrame(allocator, runtime_bar, measurer, 1000, 40, frame);
     defer scene.deinit(allocator);
 
-    try std.testing.expectEqual(@as(usize, 5), scene.draw_list.commands.len);
-    try std.testing.expectEqual(@as(usize, 5), scene.stats.total_commands);
+    try std.testing.expectEqual(@as(usize, 6), scene.draw_list.commands.len);
+    try std.testing.expectEqual(@as(usize, 6), scene.stats.total_commands);
     try std.testing.expectEqual(@as(usize, 1), scene.stats.text_draws);
     try std.testing.expectEqual(@as(u8, 16), scene.clear_color.r);
 }

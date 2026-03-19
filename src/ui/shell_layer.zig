@@ -790,8 +790,10 @@ const Buffer = struct {
         if (c.cairo_status(cr) != c.CAIRO_STATUS_SUCCESS) return error.CairoCreateFailed;
         defer c.cairo_destroy(cr);
 
-        paintColor(cr, scene.clear_color);
+        paintColor(cr, .{ .r = 0, .g = 0, .b = 0, .a = 0 });
+        c.cairo_set_operator(cr, c.CAIRO_OPERATOR_SOURCE);
         _ = c.cairo_paint(cr);
+        c.cairo_set_operator(cr, c.CAIRO_OPERATOR_OVER);
 
         configureCairoFont(cr, runtime_bar, fontFromMeasurer(measurer));
         configureCairoRenderQuality(cr);
