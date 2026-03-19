@@ -167,16 +167,24 @@ const PreviewUi = struct {
     fn executeDrawList(self: *PreviewUi, draw_list: ui_paint.DrawList) !void {
         for (draw_list.commands) |command| switch (command) {
             .fill_rect => |rect| {
-                const sdl_rect = c.SDL_FRect{ .x = rect.x, .y = rect.y, .w = rect.width, .h = rect.height };
                 const color = toColor(rect.color);
                 try sdlBool(c.SDL_SetRenderDrawColor(self.renderer, color.r, color.g, color.b, color.a));
-                try sdlBool(c.SDL_RenderFillRect(self.renderer, &sdl_rect));
+                if (rect.corner_radius > 0) {
+                    try self.renderRoundedFill(rect);
+                } else {
+                    const sdl_rect = c.SDL_FRect{ .x = rect.x, .y = rect.y, .w = rect.width, .h = rect.height };
+                    try sdlBool(c.SDL_RenderFillRect(self.renderer, &sdl_rect));
+                }
             },
             .stroke_rect => |rect| {
-                const sdl_rect = c.SDL_FRect{ .x = rect.x, .y = rect.y, .w = rect.width, .h = rect.height };
                 const color = toColor(rect.color);
                 try sdlBool(c.SDL_SetRenderDrawColor(self.renderer, color.r, color.g, color.b, color.a));
-                try sdlBool(c.SDL_RenderRect(self.renderer, &sdl_rect));
+                if (rect.corner_radius > 0) {
+                    try self.renderRoundedStroke(rect);
+                } else {
+                    const sdl_rect = c.SDL_FRect{ .x = rect.x, .y = rect.y, .w = rect.width, .h = rect.height };
+                    try sdlBool(c.SDL_RenderRect(self.renderer, &sdl_rect));
+                }
             },
             .draw_text => |text| {
                 const rendered = try self.renderText(text.text, toColor(text.color));
@@ -185,6 +193,124 @@ const PreviewUi = struct {
                 try sdlBool(c.SDL_RenderTexture(self.renderer, rendered.texture, null, &dst));
             },
         };
+    }
+
+    fn renderRoundedFill(self: *PreviewUi, rect: ui_paint.FillRect) !void {
+        const radius = effectiveRadius(rect.width, rect.height, rect.corner_radius);
+        const diameter = radius * 2.0;
+        const center_w = @max(rect.width - diameter, 0);
+        const center_h = @max(rect.height - diameter, 0);
+
+        const center = c.SDL_FRect{ .x = rect.x + radius, .y = rect.y, .w = center_w, .h = rect.height };
+        const left = c.SDL_FRect{ .x = rect.x, .y = rect.y + radius, .w = radius, .h = center_h };
+        const right = c.SDL_FRect{ .x = rect.x + rect.width - radius, .y = rect.y + radius, .w = radius, .h = center_h };
+        try sdlBool(c.SDL_RenderFillRect(self.renderer, &center));
+        try sdlBool(c.SDL_RenderFillRect(self.renderer, &left));
+        try sdlBool(c.SDL_RenderFillRect(self.renderer, &right));
+
+        try self.renderQuarterCircles(rect.x + radius, rect.y + radius, radius, .fill);
+        try self.renderQuarterCircles(rect.x + rect.width - radius, rect.y + radius, radius, .fill_top_right);
+        try self.renderQuarterCircles(rect.x + radius, rect.y + rect.height - radius, radius, .fill_bottom_left);
+        try self.renderQuarterCircles(rect.x + rect.width - radius, rect.y + rect.height - radius, radius, .fill_bottom_right);
+    }
+
+    fn renderRoundedStroke(self: *PreviewUi, rect: ui_paint.StrokeRect) !void {
+        if (rect.line_width <= 0) return;
+        const radius = effectiveRadius(rect.width, rect.height, rect.corner_radius);
+        if (radius <= 0) {
+            const sdl_rect = c.SDL_FRect{ .x = rect.x, .y = rect.y, .w = rect.width, .h = rect.height };
+            try sdlBool(c.SDL_RenderRect(self.renderer, &sdl_rect));
+            return;
+        }
+
+        const half_line = rect.line_width * 0.5;
+        const top = c.SDL_FRect{ .x = rect.x + radius, .y = rect.y, .w = @max(rect.width - (radius * 2.0), 0), .h = rect.line_width };
+        const bottom = c.SDL_FRect{ .x = rect.x + radius, .y = rect.y + rect.height - rect.line_width, .w = @max(rect.width - (radius * 2.0), 0), .h = rect.line_width };
+        const left = c.SDL_FRect{ .x = rect.x, .y = rect.y + radius, .w = rect.line_width, .h = @max(rect.height - (radius * 2.0), 0) };
+        const right = c.SDL_FRect{ .x = rect.x + rect.width - rect.line_width, .y = rect.y + radius, .w = rect.line_width, .h = @max(rect.height - (radius * 2.0), 0) };
+        try sdlBool(c.SDL_RenderFillRect(self.renderer, &top));
+        try sdlBool(c.SDL_RenderFillRect(self.renderer, &bottom));
+        try sdlBool(c.SDL_RenderFillRect(self.renderer, &left));
+        try sdlBool(c.SDL_RenderFillRect(self.renderer, &right));
+
+        try self.renderArcOutline(rect.x + radius, rect.y + radius, @max(radius - half_line, 0.5), rect.line_width, .top_left);
+        try self.renderArcOutline(rect.x + rect.width - radius, rect.y + radius, @max(radius - half_line, 0.5), rect.line_width, .top_right);
+        try self.renderArcOutline(rect.x + radius, rect.y + rect.height - radius, @max(radius - half_line, 0.5), rect.line_width, .bottom_left);
+        try self.renderArcOutline(rect.x + rect.width - radius, rect.y + rect.height - radius, @max(radius - half_line, 0.5), rect.line_width, .bottom_right);
+    }
+
+    const QuarterMode = enum {
+        fill,
+        fill_top_right,
+        fill_bottom_left,
+        fill_bottom_right,
+    };
+
+    const ArcQuadrant = enum {
+        top_left,
+        top_right,
+        bottom_left,
+        bottom_right,
+    };
+
+    fn renderQuarterCircles(self: *PreviewUi, center_x: f32, center_y: f32, radius: f32, mode: QuarterMode) !void {
+        const radius_i = @as(i32, @intFromFloat(@round(radius)));
+        var y: i32 = 0;
+        while (y <= radius_i) : (y += 1) {
+            const dy = @as(f32, @floatFromInt(y));
+            const x_extent = @sqrt(@max((radius * radius) - (dy * dy), 0));
+            const left_x = center_x - x_extent;
+            const right_x = center_x + x_extent;
+
+            switch (mode) {
+                .fill => {
+                    try self.drawHorizontalSpan(left_x, center_y - dy, center_x, center_y - dy);
+                    try self.drawHorizontalSpan(left_x, center_y + dy, center_x, center_y + dy);
+                },
+                .fill_top_right => {
+                    try self.drawHorizontalSpan(center_x, center_y - dy, right_x, center_y - dy);
+                    try self.drawHorizontalSpan(center_x, center_y + dy, right_x, center_y + dy);
+                },
+                .fill_bottom_left => {
+                    try self.drawHorizontalSpan(left_x, center_y - dy, center_x, center_y - dy);
+                    try self.drawHorizontalSpan(left_x, center_y + dy, center_x, center_y + dy);
+                },
+                .fill_bottom_right => {
+                    try self.drawHorizontalSpan(center_x, center_y - dy, right_x, center_y - dy);
+                    try self.drawHorizontalSpan(center_x, center_y + dy, right_x, center_y + dy);
+                },
+            }
+        }
+    }
+
+    fn renderArcOutline(self: *PreviewUi, center_x: f32, center_y: f32, radius: f32, line_width: f32, quadrant: ArcQuadrant) !void {
+        const radius_i = @as(i32, @intFromFloat(@round(radius + (line_width * 0.5))));
+        var y: i32 = 0;
+        while (y <= radius_i) : (y += 1) {
+            const dy = @as(f32, @floatFromInt(y));
+            const x_extent = @sqrt(@max((radius * radius) - @min(dy * dy, radius * radius), 0));
+            const thickness = @max(line_width, 1);
+            switch (quadrant) {
+                .top_left => try self.drawPointSquare(center_x - x_extent, center_y - dy, thickness),
+                .top_right => try self.drawPointSquare(center_x + x_extent, center_y - dy, thickness),
+                .bottom_left => try self.drawPointSquare(center_x - x_extent, center_y + dy, thickness),
+                .bottom_right => try self.drawPointSquare(center_x + x_extent, center_y + dy, thickness),
+            }
+        }
+    }
+
+    fn drawHorizontalSpan(self: *PreviewUi, x0: f32, y0: f32, x1: f32, y1: f32) !void {
+        try sdlBool(c.SDL_RenderLine(self.renderer, x0, y0, x1, y1));
+    }
+
+    fn drawPointSquare(self: *PreviewUi, x: f32, y: f32, size: f32) !void {
+        const rect = c.SDL_FRect{
+            .x = x - (size * 0.5),
+            .y = y - (size * 0.5),
+            .w = size,
+            .h = size,
+        };
+        try sdlBool(c.SDL_RenderFillRect(self.renderer, &rect));
     }
 
     fn renderText(self: *PreviewUi, text: []const u8, color: Color) !RenderedText {
@@ -270,6 +396,10 @@ fn openFont(runtime_bar: bar.Bar) !*c.TTF_Font {
 
 fn toColor(rgba: ui_style.Rgba) Color {
     return .{ .r = rgba.r, .g = rgba.g, .b = rgba.b, .a = rgba.a };
+}
+
+fn effectiveRadius(width: f32, height: f32, radius: f32) f32 {
+    return @min(radius, @min(width, height) * 0.5);
 }
 
 fn applySurfacePlacement(window: *c.SDL_Window, surface: ui_surface.SurfaceSpec) void {
