@@ -84,6 +84,28 @@ pub const DrawList = struct {
     pub fn deinit(self: DrawList, allocator: std.mem.Allocator) void {
         allocator.free(self.commands);
     }
+
+    pub fn stats(self: DrawList) Stats {
+        var out = Stats{};
+        for (self.commands) |command| switch (command) {
+            .fill_rect => out.fill_rects += 1,
+            .stroke_rect => out.stroke_rects += 1,
+            .push_clip_rect => out.push_clips += 1,
+            .pop_clip_rect => out.pop_clips += 1,
+            .draw_text => out.text_draws += 1,
+        };
+        out.total_commands = self.commands.len;
+        return out;
+    }
+};
+
+pub const Stats = struct {
+    total_commands: usize = 0,
+    fill_rects: usize = 0,
+    stroke_rects: usize = 0,
+    push_clips: usize = 0,
+    pop_clips: usize = 0,
+    text_draws: usize = 0,
 };
 
 pub fn effectiveRadius(width: f32, height: f32, radius: f32) f32 {
@@ -341,4 +363,11 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .overflow = .allow,
     } }, draw_list.commands[5]);
     try std.testing.expectEqualDeep(Command{ .pop_clip_rect = {} }, draw_list.commands[6]);
+    const stats = draw_list.stats();
+    try std.testing.expectEqual(@as(usize, 7), stats.total_commands);
+    try std.testing.expectEqual(@as(usize, 3), stats.fill_rects);
+    try std.testing.expectEqual(@as(usize, 1), stats.stroke_rects);
+    try std.testing.expectEqual(@as(usize, 1), stats.push_clips);
+    try std.testing.expectEqual(@as(usize, 1), stats.pop_clips);
+    try std.testing.expectEqual(@as(usize, 1), stats.text_draws);
 }

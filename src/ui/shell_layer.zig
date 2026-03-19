@@ -514,7 +514,6 @@ const LayerClient = struct {
             frame,
         );
         defer scene.deinit(std.heap.page_allocator);
-
         try self.buffer.?.paintScene(scene, runtime_bar, measurer);
 
         self.ackPendingConfigure();

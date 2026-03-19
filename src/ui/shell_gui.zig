@@ -128,7 +128,6 @@ const PreviewUi = struct {
             frame,
         );
         defer scene.deinit(std.heap.page_allocator);
-
         const background = toColor(scene.clear_color);
         try sdlBool(c.SDL_SetRenderDrawColor(self.renderer, background.r, background.g, background.b, background.a));
         try sdlBool(c.SDL_RenderClear(self.renderer));

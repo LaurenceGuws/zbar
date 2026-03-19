@@ -9,6 +9,7 @@ const text = @import("text.zig");
 pub const Scene = struct {
     clear_color: style.Rgba,
     draw_list: paint.DrawList,
+    stats: paint.Stats,
 
     pub fn deinit(self: Scene, allocator: std.mem.Allocator) void {
         self.draw_list.deinit(allocator);
@@ -44,17 +45,19 @@ pub fn presentFrame(
     );
     defer layout_frame.deinit(allocator);
 
+    const draw_list = try paint.fromLayoutFrame(
+        allocator,
+        layout_frame,
+        palette.background,
+        window_width,
+        window_height,
+        runtime_bar.edge_line_px,
+        runtime_bar.edge_shadow_alpha,
+    );
     return .{
         .clear_color = palette.background,
-        .draw_list = try paint.fromLayoutFrame(
-            allocator,
-            layout_frame,
-            palette.background,
-            window_width,
-            window_height,
-            runtime_bar.edge_line_px,
-            runtime_bar.edge_shadow_alpha,
-        ),
+        .stats = draw_list.stats(),
+        .draw_list = draw_list,
     };
 }
 
@@ -111,5 +114,7 @@ test "presentFrame produces a paint scene" {
     defer scene.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 5), scene.draw_list.commands.len);
+    try std.testing.expectEqual(@as(usize, 5), scene.stats.total_commands);
+    try std.testing.expectEqual(@as(usize, 1), scene.stats.text_draws);
     try std.testing.expectEqual(@as(u8, 16), scene.clear_color.r);
 }
