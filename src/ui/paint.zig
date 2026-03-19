@@ -36,6 +36,11 @@ pub const DrawText = struct {
         bottom,
     };
 
+    pub const Overflow = enum {
+        clip,
+        allow,
+    };
+
     text: []const u8,
     box_x: f32,
     box_y: f32,
@@ -48,6 +53,7 @@ pub const DrawText = struct {
     color: style.Rgba,
     horizontal_align: HorizontalAlign = .center,
     vertical_align: VerticalAlign = .middle,
+    overflow: Overflow = .clip,
 };
 
 pub const Command = union(enum) {
@@ -167,6 +173,7 @@ fn appendBoxes(commands: []Command, index: *usize, boxes: []const layout.Segment
             .color = box.appearance.foreground,
             .horizontal_align = .center,
             .vertical_align = .middle,
+            .overflow = .clip,
         } };
         index.* += 1;
     }
@@ -269,5 +276,6 @@ test "fromLayoutFrame emits rect and text commands per segment" {
         .color = .{ .r = 211, .g = 212, .b = 213, .a = 255 },
         .horizontal_align = .center,
         .vertical_align = .middle,
+        .overflow = .clip,
     } }, draw_list.commands[4]);
 }

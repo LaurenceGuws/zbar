@@ -808,6 +808,18 @@ const Buffer = struct {
                 paintColor(cr, text.color);
                 const baseline_y = textBaselineY(text, font_extents);
                 const x = alignedX(text);
+                if (text.overflow == .clip) {
+                    c.cairo_save(cr);
+                    c.cairo_rectangle(
+                        cr,
+                        text.box_x,
+                        text.box_y,
+                        text.box_width,
+                        text.box_height,
+                    );
+                    c.cairo_clip(cr);
+                    defer c.cairo_restore(cr);
+                }
                 c.cairo_move_to(cr, snapPixel(x), snapBaseline(baseline_y));
                 _ = c.cairo_show_text(cr, text.text.ptr);
             },

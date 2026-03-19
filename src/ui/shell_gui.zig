@@ -195,6 +195,16 @@ const PreviewUi = struct {
                     .w = rendered.width,
                     .h = rendered.height,
                 };
+                if (text.overflow == .clip) {
+                    const clip = c.SDL_Rect{
+                        .x = @intFromFloat(@round(text.box_x)),
+                        .y = @intFromFloat(@round(text.box_y)),
+                        .w = @intFromFloat(@round(text.box_width)),
+                        .h = @intFromFloat(@round(text.box_height)),
+                    };
+                    _ = c.SDL_SetRenderClipRect(self.renderer, &clip);
+                    defer _ = c.SDL_SetRenderClipRect(self.renderer, null);
+                }
                 try sdlBool(c.SDL_RenderTexture(self.renderer, rendered.texture, null, &dst));
             },
         };
