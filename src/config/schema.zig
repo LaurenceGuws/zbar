@@ -58,6 +58,11 @@ pub fn validateBarTheme(
     try validateIntField(allocator, issues, "bar.theme.segment_padding_x_px", meta.bar_theme_fields, "segment_padding_x_px", theme.segment_padding_x_px);
     try validateIntField(allocator, issues, "bar.theme.segment_padding_y_px", meta.bar_theme_fields, "segment_padding_y_px", theme.segment_padding_y_px);
     try validateIntField(allocator, issues, "bar.theme.font_points", meta.bar_theme_fields, "font_points", theme.font_points);
+    try validateIntField(allocator, issues, "bar.theme.segment_radius_px", meta.bar_theme_fields, "segment_radius_px", theme.segment_radius_px);
+    try validateIntField(allocator, issues, "bar.theme.edge_line_px", meta.bar_theme_fields, "edge_line_px", theme.edge_line_px);
+    try validateIntField(allocator, issues, "bar.theme.edge_shadow_alpha", meta.bar_theme_fields, "edge_shadow_alpha", theme.edge_shadow_alpha);
+    try validateIntField(allocator, issues, "bar.theme.segment_border_px", meta.bar_theme_fields, "segment_border_px", theme.segment_border_px);
+    try validateIntField(allocator, issues, "bar.theme.segment_border_alpha", meta.bar_theme_fields, "segment_border_alpha", theme.segment_border_alpha);
 }
 
 pub fn validateBarVisuals(
@@ -106,6 +111,11 @@ const theme_field_bindings = [_]ThemeFieldBinding{
     bindThemeInt(.segment_padding_x_px, u16),
     bindThemeInt(.segment_padding_y_px, u16),
     bindThemeInt(.font_points, u16),
+    bindThemeInt(.segment_radius_px, u16),
+    bindThemeInt(.edge_line_px, u16),
+    bindThemeInt(.edge_shadow_alpha, u8),
+    bindThemeInt(.segment_border_px, u16),
+    bindThemeInt(.segment_border_alpha, u8),
 };
 
 fn bindThemeString(comptime field: std.meta.FieldEnum(config.ThemeConfig)) ThemeFieldBinding {

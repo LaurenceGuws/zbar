@@ -88,6 +88,11 @@ pub const template =
     \\      segment_padding_x_px = 10,
     \\      segment_padding_y_px = 6,
     \\      font_points = 15,
+    \\      segment_radius_px = 6,
+    \\      edge_line_px = 1,
+    \\      edge_shadow_alpha = 235,
+    \\      segment_border_px = 1,
+    \\      segment_border_alpha = 150,
     \\    },
     \\    left = {
     \\      zbar.provider.workspaces({ name = "hypr", format = "ws {focused}/{total}" }),

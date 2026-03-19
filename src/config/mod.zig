@@ -80,6 +80,11 @@ pub const ThemeConfig = struct {
     segment_padding_x_px: u16,
     segment_padding_y_px: u16,
     font_points: u16,
+    segment_radius_px: u16,
+    edge_line_px: u16,
+    edge_shadow_alpha: u8,
+    segment_border_px: u16,
+    segment_border_alpha: u8,
 
     pub fn deinit(self: *ThemeConfig, allocator: std.mem.Allocator) void {
         allocator.free(self.segment_background);
@@ -219,6 +224,11 @@ fn defaultBarConfigWithAllocator(allocator: std.mem.Allocator) !BarConfig {
             .segment_padding_x_px = 10,
             .segment_padding_y_px = 6,
             .font_points = 15,
+            .segment_radius_px = 6,
+            .edge_line_px = 1,
+            .edge_shadow_alpha = 235,
+            .segment_border_px = 1,
+            .segment_border_alpha = 150,
         },
         .left = try dupProviders(allocator, &.{
             .{ .provider = "workspaces", .name = "hypr", .format = "ws {focused}/{total}", .interval_ms = 0, .max_width = 0, .settings = &.{} },

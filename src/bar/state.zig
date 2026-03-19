@@ -19,6 +19,11 @@ pub const Bar = struct {
     segment_padding_x_px: u16,
     segment_padding_y_px: u16,
     font_points: u16,
+    segment_radius_px: u16,
+    edge_line_px: u16,
+    edge_shadow_alpha: u8,
+    segment_border_px: u16,
+    segment_border_alpha: u8,
 
     pub fn init(cfg: config.BarConfig) Bar {
         return .{
@@ -40,6 +45,11 @@ pub const Bar = struct {
             .segment_padding_x_px = cfg.theme.segment_padding_x_px,
             .segment_padding_y_px = cfg.theme.segment_padding_y_px,
             .font_points = cfg.theme.font_points,
+            .segment_radius_px = cfg.theme.segment_radius_px,
+            .edge_line_px = cfg.theme.edge_line_px,
+            .edge_shadow_alpha = cfg.theme.edge_shadow_alpha,
+            .segment_border_px = cfg.theme.segment_border_px,
+            .segment_border_alpha = cfg.theme.segment_border_alpha,
         };
     }
 };

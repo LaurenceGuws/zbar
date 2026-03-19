@@ -18,6 +18,8 @@ pub const ShellState = struct {
 pub const FrameContext = struct {
     index: u32,
     snapshot: wm.Snapshot,
+    previous_snapshot: ?wm.Snapshot,
+    snapshot_changed: bool,
     frame: modules.Frame,
     signature: render.Renderer.Signature,
     previous_signature: ?render.Renderer.Signature,
@@ -121,7 +123,8 @@ pub fn runShell(state: *const ShellState, hooks: Hooks) !void {
 
 pub fn collectFrame(state: *const ShellState, frame_index: u32, stats: *LoopStats) !FrameContext {
     const snapshot = state.backend.snapshot();
-    const snapshot_changed = if (stats.previous_snapshot) |prior| !wm.Snapshot.eql(prior, snapshot) else true;
+    const previous_snapshot = stats.previous_snapshot;
+    const snapshot_changed = if (previous_snapshot) |prior| !wm.Snapshot.eql(prior, snapshot) else true;
     const frame = try state.registry.collect(std.heap.page_allocator, state.cfg.bar, .{
         .snapshot = snapshot,
         .snapshot_changed = snapshot_changed,
@@ -138,6 +141,8 @@ pub fn collectFrame(state: *const ShellState, frame_index: u32, stats: *LoopStat
     return .{
         .index = frame_index,
         .snapshot = snapshot,
+        .previous_snapshot = previous_snapshot,
+        .snapshot_changed = snapshot_changed,
         .frame = frame,
         .signature = signature,
         .previous_signature = previous_signature,
@@ -161,16 +166,19 @@ pub fn printRuntimeDebug(
     const layout_changed = frame_context.previous_signature == null or frame_context.previous_signature.?.layout != frame_context.signature.layout;
     const display_changed = frame_context.previous_signature == null or frame_context.previous_signature.?.display_content != frame_context.signature.display_content;
     const semantic_changed = frame_context.previous_signature == null or frame_context.previous_signature.?.semantic_content != frame_context.signature.semantic_content;
+    const snapshot_reason = snapshotReason(frame_context);
 
     var buffer: [256]u8 = undefined;
     var writer = std.fs.File.stderr().writer(&buffer);
     const err = &writer.interface;
     try err.print(
-        "debug frame={d} redraw={s} redraw_reason={s} layout_changed={s} display_changed={s} semantic_changed={s} redraw_count={d} suppressed={d} cache={d} hits={d} misses={d} timed_hits={d} timed_misses={d} snapshot_hits={d} snapshot_misses={d} timed={d} snapshot={d} sleep_ms={d}\n",
+        "debug frame={d} redraw={s} redraw_reason={s} snapshot_changed={s} snapshot_reason={s} layout_changed={s} display_changed={s} semantic_changed={s} redraw_count={d} suppressed={d} cache={d} hits={d} misses={d} timed_hits={d} timed_misses={d} snapshot_hits={d} snapshot_misses={d} timed={d} snapshot={d} sleep_ms={d}\n",
         .{
             frame_context.index + 1,
             if (did_redraw) "yes" else "no",
             frame_context.forced_redraw_reason orelse "-",
+            if (frame_context.snapshot_changed) "yes" else "no",
+            snapshot_reason,
             if (layout_changed) "yes" else "no",
             if (display_changed) "yes" else "no",
             if (semantic_changed) "yes" else "no",
@@ -189,6 +197,17 @@ pub fn printRuntimeDebug(
         },
     );
     try err.flush();
+}
+
+fn snapshotReason(frame_context: FrameContext) []const u8 {
+    const previous = frame_context.previous_snapshot orelse return "initial";
+    if (!frame_context.snapshot_changed) return "-";
+    if (previous.outputs != frame_context.snapshot.outputs) return "outputs";
+    if (previous.workspaces != frame_context.snapshot.workspaces) return "workspaces";
+    if (previous.focused_workspace != frame_context.snapshot.focused_workspace) return "focused_workspace";
+    if (!std.mem.eql(u8, previous.focused_title, frame_context.snapshot.focused_title)) return "focused_title";
+    if (!std.mem.eql(u8, previous.compositor, frame_context.snapshot.compositor)) return "compositor";
+    return "unknown";
 }
 
 test "sleepMs prefers explicit override" {

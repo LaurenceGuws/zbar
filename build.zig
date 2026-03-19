@@ -68,6 +68,7 @@ pub fn build(b: *std.Build) void {
         exe.addIncludePath(b.path("src/ui/wayland"));
         exe.linkLibrary(wayland_protocols);
         exe.root_module.linkSystemLibrary("cairo", .{ .use_pkg_config = .force });
+        exe.root_module.linkSystemLibrary("freetype2", .{ .use_pkg_config = .force });
         exe.root_module.linkSystemLibrary("sdl3", .{ .use_pkg_config = .force });
         exe.root_module.linkSystemLibrary("sdl3-ttf", .{ .use_pkg_config = .force });
         exe.root_module.linkSystemLibrary("wayland-client", .{ .use_pkg_config = .force });
@@ -90,6 +91,7 @@ pub fn build(b: *std.Build) void {
         mod_tests.addIncludePath(b.path("src/ui/wayland"));
         mod_tests.linkLibrary(wayland_protocols);
         mod_tests.root_module.linkSystemLibrary("cairo", .{ .use_pkg_config = .force });
+        mod_tests.root_module.linkSystemLibrary("freetype2", .{ .use_pkg_config = .force });
         mod_tests.root_module.linkSystemLibrary("sdl3", .{ .use_pkg_config = .force });
         mod_tests.root_module.linkSystemLibrary("sdl3-ttf", .{ .use_pkg_config = .force });
         mod_tests.root_module.linkSystemLibrary("wayland-client", .{ .use_pkg_config = .force });
@@ -105,6 +107,7 @@ pub fn build(b: *std.Build) void {
         exe_tests.addIncludePath(b.path("src/ui/wayland"));
         exe_tests.linkLibrary(wayland_protocols);
         exe_tests.root_module.linkSystemLibrary("cairo", .{ .use_pkg_config = .force });
+        exe_tests.root_module.linkSystemLibrary("freetype2", .{ .use_pkg_config = .force });
         exe_tests.root_module.linkSystemLibrary("wayland-client", .{ .use_pkg_config = .force });
     }
     const run_exe_tests = b.addRunArtifact(exe_tests);

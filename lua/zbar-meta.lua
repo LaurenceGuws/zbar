@@ -93,6 +93,11 @@
 ---@field segment_padding_x_px? integer Horizontal padding inside each segment box. Constraints: min=0.
 ---@field segment_padding_y_px? integer Vertical padding inside each segment box. Constraints: min=0.
 ---@field font_points? integer Font point size for GUI preview. Constraints: min=8.
+---@field segment_radius_px? integer Corner radius for segment boxes in rendered backends. Constraints: min=0.
+---@field edge_line_px? integer Top and bottom edge line thickness for the bar surface. Constraints: min=0.
+---@field edge_shadow_alpha? integer Alpha applied to the lower edge treatment. Constraints: min=0, max=255.
+---@field segment_border_px? integer Border thickness for segment boxes. Constraints: min=0.
+---@field segment_border_alpha? integer Alpha applied to segment box borders. Constraints: min=0, max=255.
 
 ---@class ZbarBarConfig
 ---@field height_px? integer Bar height in pixels. Constraints: min=16.

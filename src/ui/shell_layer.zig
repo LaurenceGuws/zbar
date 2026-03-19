@@ -10,7 +10,10 @@ const ui_text = @import("text.zig");
 const wm = @import("../wm/mod.zig");
 const RunOptions = @import("../app/state.zig").RunOptions;
 const c = @cImport({
+    @cInclude("ft2build.h");
+    @cInclude("freetype/freetype.h");
     @cInclude("cairo/cairo.h");
+    @cInclude("cairo/cairo-ft.h");
     @cInclude("sys/mman.h");
     @cInclude("wayland-client.h");
     @cInclude("wayland-client-protocol.h");
@@ -104,19 +107,25 @@ pub const Shell = struct {
 const LayerUi = struct {
     client: LayerClient,
     backend: wm.Backend,
+    redraw_reason_buffer: [32]u8 = undefined,
     last_redraw_reason: ?[]const u8 = null,
+    text_measurer: CairoTextMeasurer,
 
     fn init(runtime_bar: bar.Bar, backend: wm.Backend) !LayerUi {
         var client = try LayerClient.init(runtime_bar);
         errdefer client.deinit();
         try client.createSurface();
+        var text_measurer = try CairoTextMeasurer.init(runtime_bar);
+        errdefer text_measurer.deinit();
         return .{
             .client = client,
             .backend = backend,
+            .text_measurer = text_measurer,
         };
     }
 
     fn deinit(self: *LayerUi) void {
+        self.text_measurer.deinit();
         self.client.deinit();
     }
 
@@ -146,14 +155,13 @@ const LayerUi = struct {
 
     fn drawFrame(context: *anyopaque, runtime_bar: bar.Bar, frame: modules.Frame) !void {
         const self: *LayerUi = @ptrCast(@alignCast(context));
-        _ = runtime_bar;
-        try self.client.presentFrame(frame);
+        try self.client.presentFrame(self.text_measurer.measurer(), frame, runtime_bar);
     }
 
     fn forceRedraw(context: *anyopaque) bool {
         const self: *LayerUi = @ptrCast(@alignCast(context));
         const dirty = self.client.takeDirty();
-        self.last_redraw_reason = dirty.primaryReason();
+        self.last_redraw_reason = dirty.formatReason(&self.redraw_reason_buffer);
         return dirty.any();
     }
 
@@ -174,6 +182,44 @@ const LayerUi = struct {
             self.backend.waitForChange(slice_ms);
             remaining_ms -= slice_ms;
         }
+    }
+};
+
+const CairoFont = struct {
+    ft_library: c.FT_Library,
+    ft_face: c.FT_Face,
+    font_face: *c.cairo_font_face_t,
+
+    fn init(runtime_bar: bar.Bar) ?CairoFont {
+        var ft_library: c.FT_Library = null;
+        if (c.FT_Init_FreeType(&ft_library) != 0 or ft_library == null) return null;
+        errdefer _ = c.FT_Done_FreeType(ft_library);
+
+        const path = selectFontPath(runtime_bar) orelse return null;
+        const path_z = std.heap.page_allocator.dupeZ(u8, path) catch return null;
+        defer std.heap.page_allocator.free(path_z);
+
+        var ft_face: c.FT_Face = null;
+        if (c.FT_New_Face(ft_library, path_z.ptr, 0, &ft_face) != 0 or ft_face == null) return null;
+        errdefer _ = c.FT_Done_Face(ft_face);
+
+        const font_face = c.cairo_ft_font_face_create_for_ft_face(ft_face, 0) orelse return null;
+        if (c.cairo_font_face_status(font_face) != c.CAIRO_STATUS_SUCCESS) {
+            c.cairo_font_face_destroy(font_face);
+            return null;
+        }
+
+        return .{
+            .ft_library = ft_library,
+            .ft_face = ft_face,
+            .font_face = font_face,
+        };
+    }
+
+    fn deinit(self: *CairoFont) void {
+        c.cairo_font_face_destroy(self.font_face);
+        _ = c.FT_Done_Face(self.ft_face);
+        _ = c.FT_Done_FreeType(self.ft_library);
     }
 };
 
@@ -451,7 +497,7 @@ const LayerClient = struct {
         _ = c.wl_display_roundtrip(self.display);
     }
 
-    fn presentFrame(self: *LayerClient, frame: modules.Frame) !void {
+    fn presentFrame(self: *LayerClient, measurer: ui_text.Measurer, frame: modules.Frame, runtime_bar: bar.Bar) !void {
         const width = self.surface_state.width(self.runtime_bar);
         const height = self.surface_state.height(self.runtime_bar);
         if (self.buffer) |*old_buffer| old_buffer.deinit();
@@ -460,15 +506,15 @@ const LayerClient = struct {
 
         const scene = try ui_presenter.presentFrame(
             std.heap.page_allocator,
-            self.runtime_bar,
-            approxMeasurer(),
+            runtime_bar,
+            measurer,
             @floatFromInt(width),
             @floatFromInt(height),
             frame,
         );
         defer scene.deinit(std.heap.page_allocator);
 
-        try self.buffer.?.paintScene(scene, self.runtime_bar);
+        try self.buffer.?.paintScene(scene, runtime_bar, measurer);
 
         self.ackPendingConfigure();
         c.wl_surface_attach(self.surface, self.buffer.?.buffer, 0, 0);
@@ -486,6 +532,68 @@ const LayerClient = struct {
             c.zwlr_layer_surface_v1_ack_configure(self.layer_surface, serial);
             self.surface_state.pending_configure_serial = null;
         }
+    }
+};
+
+const CairoTextMeasurer = struct {
+    surface: *c.cairo_surface_t,
+    cr: *c.cairo_t,
+    font: ?CairoFont = null,
+
+    fn init(runtime_bar: bar.Bar) !CairoTextMeasurer {
+        const surface = c.cairo_image_surface_create(c.CAIRO_FORMAT_ARGB32, 1, 1) orelse return error.CairoSurfaceCreateFailed;
+        if (c.cairo_surface_status(surface) != c.CAIRO_STATUS_SUCCESS) return error.CairoSurfaceCreateFailed;
+        errdefer c.cairo_surface_destroy(surface);
+
+        const cr = c.cairo_create(surface) orelse return error.CairoCreateFailed;
+        if (c.cairo_status(cr) != c.CAIRO_STATUS_SUCCESS) return error.CairoCreateFailed;
+        errdefer c.cairo_destroy(cr);
+
+        var font = CairoFont.init(runtime_bar);
+        errdefer if (font) |*value| value.deinit();
+
+        configureCairoFont(cr, runtime_bar, if (font) |*value| value else null);
+
+        return .{
+            .surface = surface,
+            .cr = cr,
+            .font = font,
+        };
+    }
+
+    fn deinit(self: *CairoTextMeasurer) void {
+        if (self.font) |*font| font.deinit();
+        c.cairo_destroy(self.cr);
+        c.cairo_surface_destroy(self.surface);
+    }
+
+    fn measurer(self: *CairoTextMeasurer) ui_text.Measurer {
+        return .{
+            .context = @ptrCast(self),
+            .vtable = &.{
+                .measure = measureText,
+            },
+        };
+    }
+
+    fn measureText(context: *anyopaque, text: []const u8) !ui_text.Size {
+        const self: *CairoTextMeasurer = @ptrCast(@alignCast(context));
+        var extents: c.cairo_text_extents_t = undefined;
+        _ = c.cairo_text_extents(self.cr, text.ptr, &extents);
+
+        var font_extents: c.cairo_font_extents_t = undefined;
+        _ = c.cairo_font_extents(self.cr, &font_extents);
+
+        const width = @max(@as(f32, @floatCast(extents.x_advance)), @as(f32, @floatCast(extents.width)));
+        const height = @max(@as(f32, @floatCast(font_extents.height)), @as(f32, @floatCast(extents.height)));
+        return .{
+            .width = @max(width, 1),
+            .height = @max(height, 1),
+        };
+    }
+
+    fn fontPtr(self: *CairoTextMeasurer) ?*CairoFont {
+        return if (self.font) |*font| font else null;
     }
 };
 
@@ -520,11 +628,28 @@ const DirtyState = packed struct(u8) {
         return current;
     }
 
-    fn primaryReason(self: DirtyState) ?[]const u8 {
-        if (self.initial) return "initial";
-        if (self.configure) return "configure";
-        if (self.output) return "output";
-        return null;
+    fn formatReason(self: DirtyState, buffer: []u8) ?[]const u8 {
+        if (!self.any()) return null;
+
+        var stream = std.io.fixedBufferStream(buffer);
+        const writer = stream.writer();
+        var first = true;
+
+        if (self.initial) {
+            writer.writeAll("initial") catch return "initial";
+            first = false;
+        }
+        if (self.configure) {
+            if (!first) writer.writeAll("+") catch {};
+            writer.writeAll("configure") catch return if (first) "configure" else stream.getWritten();
+            first = false;
+        }
+        if (self.output) {
+            if (!first) writer.writeAll("+") catch {};
+            writer.writeAll("output") catch return if (first) "output" else stream.getWritten();
+        }
+
+        return stream.getWritten();
     }
 };
 
@@ -640,7 +765,7 @@ const Buffer = struct {
         std.posix.close(self.fd);
     }
 
-    fn paintScene(self: *Buffer, scene: ui_presenter.Scene, runtime_bar: bar.Bar) !void {
+    fn paintScene(self: *Buffer, scene: ui_presenter.Scene, runtime_bar: bar.Bar, measurer: ui_text.Measurer) !void {
         const surface = c.cairo_image_surface_create_for_data(
             self.data.ptr,
             c.CAIRO_FORMAT_ARGB32,
@@ -657,19 +782,31 @@ const Buffer = struct {
 
         paintColor(cr, scene.clear_color);
         _ = c.cairo_paint(cr);
+        drawBarEdgeTreatments(cr, scene.clear_color, self.width, self.height, runtime_bar);
 
-        c.cairo_select_font_face(cr, "Sans", c.CAIRO_FONT_SLANT_NORMAL, c.CAIRO_FONT_WEIGHT_NORMAL);
-        c.cairo_set_font_size(cr, @floatFromInt(runtime_bar.font_points));
+        configureCairoFont(cr, runtime_bar, fontFromMeasurer(measurer));
+        configureCairoRenderQuality(cr);
+        var font_extents: c.cairo_font_extents_t = undefined;
+        _ = c.cairo_font_extents(cr, &font_extents);
 
         for (scene.draw_list.commands) |command| switch (command) {
             .fill_rect => |rect| {
                 paintColor(cr, rect.color);
-                c.cairo_rectangle(cr, rect.x, rect.y, rect.width, rect.height);
+                roundedRectangle(
+                    cr,
+                    snapPixel(rect.x),
+                    snapPixel(rect.y),
+                    snapExtent(rect.width),
+                    snapExtent(rect.height),
+                    @floatFromInt(runtime_bar.segment_radius_px),
+                );
                 _ = c.cairo_fill(cr);
+                drawSegmentBorder(cr, rect.color, runtime_bar, rect);
             },
             .draw_text => |text| {
                 paintColor(cr, text.color);
-                c.cairo_move_to(cr, text.x, text.y + text.height - 2);
+                const baseline_y = textBaselineY(text.y, text.height, font_extents);
+                c.cairo_move_to(cr, snapPixel(text.x), snapBaseline(baseline_y));
                 _ = c.cairo_show_text(cr, text.text.ptr);
             },
         };
@@ -677,20 +814,6 @@ const Buffer = struct {
         c.cairo_surface_flush(surface);
     }
 };
-
-fn approxMeasurer() ui_text.Measurer {
-    return .{
-        .context = undefined,
-        .vtable = &.{
-            .measure = measureApproxText,
-        },
-    };
-}
-
-fn measureApproxText(_: *anyopaque, text: []const u8) !ui_text.Size {
-    const width = @as(f32, @floatFromInt(@max(text.len, 1) * 8));
-    return .{ .width = width, .height = 16 };
-}
 
 fn paintColor(cr: *c.cairo_t, rgba: ui_style.Rgba) void {
     c.cairo_set_source_rgba(
@@ -700,4 +823,126 @@ fn paintColor(cr: *c.cairo_t, rgba: ui_style.Rgba) void {
         @as(f64, @floatFromInt(rgba.b)) / 255.0,
         @as(f64, @floatFromInt(rgba.a)) / 255.0,
     );
+}
+
+fn configureCairoFont(cr: *c.cairo_t, runtime_bar: bar.Bar, font: ?*CairoFont) void {
+    if (font) |loaded| {
+        c.cairo_set_font_face(cr, loaded.font_face);
+    } else {
+        c.cairo_select_font_face(cr, "Sans", c.CAIRO_FONT_SLANT_NORMAL, c.CAIRO_FONT_WEIGHT_NORMAL);
+    }
+    c.cairo_set_font_size(cr, @floatFromInt(runtime_bar.font_points));
+}
+
+fn configureCairoRenderQuality(cr: *c.cairo_t) void {
+    c.cairo_set_antialias(cr, c.CAIRO_ANTIALIAS_BEST);
+    c.cairo_set_operator(cr, c.CAIRO_OPERATOR_OVER);
+
+    const options = c.cairo_font_options_create() orelse return;
+    defer c.cairo_font_options_destroy(options);
+
+    c.cairo_font_options_set_antialias(options, c.CAIRO_ANTIALIAS_SUBPIXEL);
+    c.cairo_font_options_set_subpixel_order(options, c.CAIRO_SUBPIXEL_ORDER_RGB);
+    c.cairo_font_options_set_hint_style(options, c.CAIRO_HINT_STYLE_SLIGHT);
+    c.cairo_font_options_set_hint_metrics(options, c.CAIRO_HINT_METRICS_ON);
+    c.cairo_set_font_options(cr, options);
+}
+
+fn drawBarEdgeTreatments(cr: *c.cairo_t, clear_color: ui_style.Rgba, width: u32, height: u32, runtime_bar: bar.Bar) void {
+    if (runtime_bar.edge_line_px == 0) return;
+    const top = tintColor(clear_color, 0.16, 220);
+    const bottom = tintColor(clear_color, -0.18, runtime_bar.edge_shadow_alpha);
+    const line_height: f64 = @floatFromInt(runtime_bar.edge_line_px);
+
+    paintColor(cr, top);
+    c.cairo_rectangle(cr, 0, 0, @floatFromInt(width), line_height);
+    _ = c.cairo_fill(cr);
+
+    paintColor(cr, bottom);
+    c.cairo_rectangle(cr, 0, @floatFromInt(@max(height, runtime_bar.edge_line_px) - runtime_bar.edge_line_px), @floatFromInt(width), line_height);
+    _ = c.cairo_fill(cr);
+}
+
+fn textBaselineY(y: f32, height: f32, font_extents: c.cairo_font_extents_t) f64 {
+    const ascent = @as(f32, @floatCast(font_extents.ascent));
+    const descent = @as(f32, @floatCast(font_extents.descent));
+    const content_height = ascent + descent;
+    const top = y + @max((height - content_height) * 0.5, 0);
+    return @as(f64, top + ascent);
+}
+
+fn roundedRectangle(cr: *c.cairo_t, x: f64, y: f64, width: f64, height: f64, radius: f64) void {
+    const effective_radius = @min(radius, @min(width, height) * 0.5);
+    const right = x + width;
+    const bottom = y + height;
+
+    c.cairo_new_sub_path(cr);
+    c.cairo_arc(cr, right - effective_radius, y + effective_radius, effective_radius, -std.math.pi * 0.5, 0);
+    c.cairo_arc(cr, right - effective_radius, bottom - effective_radius, effective_radius, 0, std.math.pi * 0.5);
+    c.cairo_arc(cr, x + effective_radius, bottom - effective_radius, effective_radius, std.math.pi * 0.5, std.math.pi);
+    c.cairo_arc(cr, x + effective_radius, y + effective_radius, effective_radius, std.math.pi, std.math.pi * 1.5);
+    c.cairo_close_path(cr);
+}
+
+fn tintColor(color: ui_style.Rgba, amount: f32, alpha: u8) ui_style.Rgba {
+    return .{
+        .r = tintChannel(color.r, amount),
+        .g = tintChannel(color.g, amount),
+        .b = tintChannel(color.b, amount),
+        .a = alpha,
+    };
+}
+
+fn tintChannel(channel: u8, amount: f32) u8 {
+    const base: f32 = @floatFromInt(channel);
+    const delta = if (amount >= 0) (255.0 - base) * amount else base * amount;
+    return @intFromFloat(std.math.clamp(base + delta, 0, 255));
+}
+
+fn drawSegmentBorder(cr: *c.cairo_t, fill: ui_style.Rgba, runtime_bar: bar.Bar, rect: @import("paint.zig").FillRect) void {
+    if (runtime_bar.segment_border_px == 0 or runtime_bar.segment_border_alpha == 0) return;
+
+    const border = tintColor(fill, 0.18, runtime_bar.segment_border_alpha);
+    paintColor(cr, border);
+    c.cairo_set_line_width(cr, @floatFromInt(runtime_bar.segment_border_px));
+    roundedRectangle(
+        cr,
+        snapPixel(rect.x) + (@as(f64, @floatFromInt(runtime_bar.segment_border_px)) * 0.5),
+        snapPixel(rect.y) + (@as(f64, @floatFromInt(runtime_bar.segment_border_px)) * 0.5),
+        @max(snapExtent(rect.width) - @as(f64, @floatFromInt(runtime_bar.segment_border_px)), 1.0),
+        @max(snapExtent(rect.height) - @as(f64, @floatFromInt(runtime_bar.segment_border_px)), 1.0),
+        @floatFromInt(runtime_bar.segment_radius_px),
+    );
+    _ = c.cairo_stroke(cr);
+}
+
+fn snapPixel(value: f32) f64 {
+    return @as(f64, @floatCast(@round(value))) + 0.5;
+}
+
+fn snapExtent(value: f32) f64 {
+    return @max(@as(f64, @floatCast(@round(value))), 1.0);
+}
+
+fn snapBaseline(value: f64) f64 {
+    return @round(value * 2.0) / 2.0;
+}
+
+fn fontFromMeasurer(measurer: ui_text.Measurer) ?*CairoFont {
+    const context = measurer.context;
+    const cairo_measurer: *CairoTextMeasurer = @ptrCast(@alignCast(context));
+    return cairo_measurer.fontPtr();
+}
+
+fn selectFontPath(runtime_bar: bar.Bar) ?[]const u8 {
+    const candidates = [_][]const u8{
+        runtime_bar.font_path,
+        runtime_bar.font_fallback_path,
+        runtime_bar.font_fallback_path_2,
+    };
+    for (candidates) |path| {
+        if (path.len == 0) continue;
+        return path;
+    }
+    return null;
 }

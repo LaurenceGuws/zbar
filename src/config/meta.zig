@@ -109,6 +109,11 @@ const BarTheme = struct {
     segment_padding_x_px: i64,
     segment_padding_y_px: i64,
     font_points: i64,
+    segment_radius_px: i64,
+    edge_line_px: i64,
+    edge_shadow_alpha: i64,
+    segment_border_px: i64,
+    segment_border_alpha: i64,
 };
 
 const BarVisuals = struct {
@@ -317,6 +322,33 @@ pub const bar_theme_fields = fieldsFromStruct(BarTheme, &.{
         .doc = "Font point size for GUI preview.",
         .min_int = 8,
         .snippet_value = "15",
+    }),
+    fieldOverride(BarTheme, .segment_radius_px, .{
+        .doc = "Corner radius for segment boxes in rendered backends.",
+        .min_int = 0,
+        .snippet_value = "6",
+    }),
+    fieldOverride(BarTheme, .edge_line_px, .{
+        .doc = "Top and bottom edge line thickness for the bar surface.",
+        .min_int = 0,
+        .snippet_value = "1",
+    }),
+    fieldOverride(BarTheme, .edge_shadow_alpha, .{
+        .doc = "Alpha applied to the lower edge treatment.",
+        .min_int = 0,
+        .max_int = 255,
+        .snippet_value = "235",
+    }),
+    fieldOverride(BarTheme, .segment_border_px, .{
+        .doc = "Border thickness for segment boxes.",
+        .min_int = 0,
+        .snippet_value = "1",
+    }),
+    fieldOverride(BarTheme, .segment_border_alpha, .{
+        .doc = "Alpha applied to segment box borders.",
+        .min_int = 0,
+        .max_int = 255,
+        .snippet_value = "150",
     }),
 });
 
