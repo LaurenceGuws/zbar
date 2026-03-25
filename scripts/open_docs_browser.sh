@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOCS_EXPLORER_DIR="$ROOT_DIR/../docs-explorer"
-DOCS_CONFIG_DIR="$DOCS_EXPLORER_DIR/config"
+DOCS_CONFIG_DIR="$DOCS_EXPLORER_DIR/config/local"
 PORT="${1:-8010}"
 
 if [[ ! -d "$DOCS_EXPLORER_DIR" ]]; then
@@ -23,4 +23,4 @@ if [[ ! -f "$DOCS_EXPLORER_DIR/build/js/main.js" ]]; then
 fi
 
 cd "$DOCS_EXPLORER_DIR"
-python3 docs_explorer.py "$PORT" project.zbar.json
+python3 docs_explorer.py "$PORT" config/local/project.zbar.json
