@@ -18,4 +18,4 @@ if [[ ! -f "$DOCS_EXPLORER_DIR/build/js/main.js" ]]; then
 fi
 
 cd "$DOCS_EXPLORER_DIR"
-python3 docs_explorer.py "$PORT" "$ROOT_DIR/tools/docs_explorer/project.zbar.json"
+python3 docs_explorer.py "$PORT" "$ROOT_DIR/tools/docs_browser/project.zbar.json"
