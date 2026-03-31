@@ -1,4 +1,4 @@
-# zbar
+<h1><img src="assets/icon/zbar-icon.png" alt="Z" width="44" align="absmiddle" />bar</h1>
 
 A native Zig status bar project aimed at replacing Waybar with a lower-footprint,
 more explicit architecture: schema-driven Lua config, pluggable providers, and a
@@ -12,7 +12,7 @@ backend-neutral UI stack that can grow into a real Wayland layer-shell bar.
 
 - [Docs Index](docs/INDEX.md)
 - [Roadmap](docs/todo/README.md)
-- [Architecture Notes](docs/architecture/README.md)
+- [Architecture Notes](app_architecture/README.md)
 
 ## What zbar Is
 
@@ -65,6 +65,18 @@ zig build test
 zig build meta
 zig build run -- --lint-config --config config.lua
 ZBAR_CONFIG_LUA=config.lua zig build run
+```
+
+`zbar` now consumes `zlua-portable` as a pinned Zig package dependency from the
+`v0.1.0-beta.1` release line.
+
+For local co-development only, you can temporarily replace that pinned package
+with a sibling path dependency to a local `zlua-portable` checkout:
+
+```zig
+.zlua_portable = .{
+    .path = "../zlua-portable",
+},
 ```
 
 Useful runtime variants:
