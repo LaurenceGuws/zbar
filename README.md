@@ -5,6 +5,8 @@ more explicit architecture: schema-driven Lua config, pluggable providers, and a
 backend-neutral UI stack that can grow into a real Wayland layer-shell bar.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Shared Lua](https://img.shields.io/badge/shared--lua-zlua--portable-2f855a)](https://github.com/LaurenceGuws/zlua-portable)
+[![Sibling App](https://img.shields.io/badge/sibling%20app-zide-1f6feb)](https://github.com/LaurenceGuws/Zide)
 [![Zig](https://img.shields.io/badge/zig-0.15.2-f7a41d)](https://ziglang.org/download/)
 [![Status](https://img.shields.io/badge/status-pre--alpha-b44cff)](#current-status)
 
@@ -13,6 +15,13 @@ backend-neutral UI stack that can grow into a real Wayland layer-shell bar.
 - [Docs Index](docs/INDEX.md)
 - [Roadmap](docs/todo/README.md)
 - [Architecture Notes](app_architecture/README.md)
+
+## Related Projects
+
+- [zlua-portable](https://github.com/LaurenceGuws/zlua-portable) provides the
+  shared low-level Lua state and reader helpers used by `zbar`.
+- [Zide](https://github.com/LaurenceGuws/Zide) is the sibling Zig IDE/terminal
+  project that shares the same `zlua-portable` package boundary.
 
 ## What zbar Is
 
